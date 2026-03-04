@@ -1058,9 +1058,15 @@ so_default_dynlib default_dynlib[] = {
 };
 
 void *dlsym_soloader(void * handle, const char * symbol) {
+    (void)handle;
+
+    uintptr_t link = so_symbol_global(NULL, symbol, 1);
+    if (link)
+        return (void *)link;
+
     for (int i = 0; i < sizeof(default_dynlib) / sizeof(default_dynlib[0]); i++) {
         if (strcmp(symbol, default_dynlib[i].symbol) == 0) {
-            return &default_dynlib[i].func;
+            return (void *)default_dynlib[i].func;
         }
     }
 
