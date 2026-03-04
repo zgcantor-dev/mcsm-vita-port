@@ -22,6 +22,9 @@ uint64_t SDL_GetTicks64(void);
 int SDL_SetHint(const char *name, const char *value);
 const char *SDL_GetHint(const char *name);
 #endif
+void *SDL_AndroidGetJNIEnv(void);
+const char *SDL_AndroidGetInternalStoragePath(void);
+int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
 void SDL_SetMainReady_REAL(void);
 void *resolve_builtin(const char *name);
