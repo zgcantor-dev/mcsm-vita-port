@@ -97,9 +97,13 @@ if (USE_OBB)
 endif()
 
 # SDL2 support toggle
+# NOTE: Our libGameEngine SDL import resolution now binds directly to linked Vita SDL2
+# symbols. Keep this enabled for normal builds.
 option(USE_SDL2 "Enable SDL2 support for SDL-based Android games" ON)
 if (USE_SDL2)
   add_definitions(-DUSE_SDL2)
+else()
+  message(FATAL_ERROR "USE_SDL2=OFF is unsupported: libGameEngine SDL imports are resolved against Vita SDL2 bindings.")
 endif()
 
 option(USE_SCELIBC_IO "Use SceLibcBridge for IO and some other std functions" ON)
