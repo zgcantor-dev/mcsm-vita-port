@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "reimpl/sys.h"
+#include "reimpl/egl.h"
 
 #ifdef USE_SDL2
 #include <SDL2/SDL.h>
@@ -201,6 +202,11 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_AndroidGetExternalStorageState", (void *)&SDL_AndroidGetExternalStorageState },
     { "SDL_Android_Init", (void *)&SDL_Android_Init },
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
+    { "eglGetProcAddress", (void *)&eglGetProcAddress },
+    { "eglGetCurrentDisplay", (void *)&eglGetCurrentDisplay },
+    { "eglGetConfigs", (void *)&eglGetConfigs },
+    { "eglGetConfigAttrib", (void *)&eglGetConfigAttrib },
+    { "eglGetDisplay", (void *)&egl_shim_get_display },
 #ifdef USE_SDL2
     { "SDL_SetMainReady", (void *)&SDL_SetMainReady },
 #endif

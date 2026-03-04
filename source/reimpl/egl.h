@@ -57,6 +57,10 @@ EGLContext eglGetCurrentContext (void);
 EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig * configs,
                          EGLint config_size, EGLint * num_config);
 
+EGLDisplay eglGetCurrentDisplay(void);
+void egl_shim_set_current_display(EGLDisplay dpy);
+EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id);
+
 char const * eglQueryString(EGLDisplay display, EGLint name);
 
 #define EGL_CONFIG_ID                     0x3028

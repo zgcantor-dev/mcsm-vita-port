@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "reimpl/egl.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,6 +29,12 @@ const char *SDL_AndroidGetInternalStoragePath(void);
 int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
 void SDL_SetMainReady_REAL(void);
+
+EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id);
+EGLDisplay eglGetCurrentDisplay(void);
+EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+EGLBoolean eglGetConfigAttrib(EGLDisplay display, EGLConfig config, EGLint attribute, EGLint *value);
+
 void *resolve_builtin(const char *name);
 
 #ifdef __cplusplus

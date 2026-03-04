@@ -11,7 +11,26 @@
 #include "utils/logger.h"
 
 #include <string.h>
+#include <stdint.h>
 #include <stdlib.h>
+
+static EGLConfig g_fake_cfg = (EGLConfig)(uintptr_t)0xC0FFEE01;
+static EGLDisplay g_current_display = (EGLDisplay)(uintptr_t)0x1;
+
+void egl_shim_set_current_display(EGLDisplay dpy) {
+    if (dpy)
+        g_current_display = dpy;
+}
+
+EGLDisplay eglGetCurrentDisplay(void) {
+    return g_current_display;
+}
+
+EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id) {
+    EGLDisplay dpy = eglGetDisplay(display_id);
+    egl_shim_set_current_display(dpy);
+    return dpy;
+}
 
 EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor) {
     l_debug("eglInitialize(0x%x)", (int)dpy);
@@ -116,157 +135,59 @@ EGLBoolean eglQuerySurface(EGLDisplay dpy, EGLSurface eglSurface,
 
 
 EGLBoolean eglGetConfigAttrib(EGLDisplay display, EGLConfig config,
-                              EGLint attribute, EGLint * value) {
+                              EGLint attribute, EGLint *value) {
+    (void)display;
+
+    if (!value)
+        return EGL_FALSE;
+
+    if (config != g_fake_cfg)
+        return EGL_FALSE;
+
     switch (attribute) {
-        case EGL_ALPHA_SIZE: {
+        case EGL_RED_SIZE:
             *value = 8;
-            break;
-        }
-        case EGL_ALPHA_MASK_SIZE: {
+            return EGL_TRUE;
+        case EGL_GREEN_SIZE:
             *value = 8;
-            break;
-        }
-        case EGL_BIND_TO_TEXTURE_RGB: {
-            *value = EGL_TRUE;
-            break;
-        }
-        case EGL_BIND_TO_TEXTURE_RGBA: {
-            *value = EGL_TRUE;
-            break;
-        }
-        case EGL_BLUE_SIZE: {
+            return EGL_TRUE;
+        case EGL_BLUE_SIZE:
             *value = 8;
-            break;
-        }
-        case EGL_BUFFER_SIZE: {
-            *value = 32;
-            break;
-        }
-        case EGL_COLOR_BUFFER_TYPE: {
-            *value = EGL_RGB_BUFFER;
-            break;
-        }
-        case EGL_CONFIG_CAVEAT: {
-            *value = EGL_NONE;
-            break;
-        }
-        case EGL_CONFIG_ID: {
-            *value = 0;
-            break;
-        }
-        case EGL_CONFORMANT: {
-            *value = 0;
-            break;
-        }
-        case EGL_DEPTH_SIZE: {
+            return EGL_TRUE;
+        case EGL_ALPHA_SIZE:
+            *value = 8;
+            return EGL_TRUE;
+        case EGL_DEPTH_SIZE:
             *value = 24;
-            break;
-        }
-        case EGL_GREEN_SIZE: {
+            return EGL_TRUE;
+        case EGL_STENCIL_SIZE:
             *value = 8;
-            break;
-        }
-        case EGL_LEVEL: {
-            *value = 0;
-            break;
-        }
-        case EGL_LUMINANCE_SIZE: {
-            *value = 0;
-            break;
-        }
-        case EGL_MAX_PBUFFER_WIDTH: {
-            *value = 0;
-            break;
-        }
-        case EGL_MAX_PBUFFER_HEIGHT: {
-            *value = 0;
-            break;
-        }
-        case EGL_MAX_PBUFFER_PIXELS: {
-            *value = 0;
-            break;
-        }
-        case EGL_MAX_SWAP_INTERVAL: {
-            *value = 0;
-            break;
-        }
-        case EGL_MIN_SWAP_INTERVAL: {
-            *value = 0;
-            break;
-        }
-        case EGL_NATIVE_RENDERABLE: {
-            *value = 0;
-            break;
-        }
-        case EGL_NATIVE_VISUAL_ID: {
-            *value = 0;
-            break;
-        }
-        case EGL_NATIVE_VISUAL_TYPE: {
-            *value = 0;
-            break;
-        }
-        case EGL_RED_SIZE: {
-            *value = 8;
-            break;
-        }
-        case EGL_RENDERABLE_TYPE: {
-            *value = EGL_OPENGL_ES_BIT | EGL_OPENGL_ES2_BIT | EGL_OPENGL_BIT;
-            break;
-        }
-        case EGL_SAMPLE_BUFFERS: {
-            *value = 0;
-            break;
-        }
-        case EGL_SAMPLES: {
-            *value = 0;
-            break;
-        }
-        case EGL_STENCIL_SIZE: {
-            *value = 8;
-            break;
-        }
-        case EGL_SURFACE_TYPE: {
-            *value = 0 | EGL_WINDOW_BIT;
-            break;
-        }
-        case EGL_TRANSPARENT_TYPE: {
-            *value = 0;
-            break;
-        }
-        case EGL_TRANSPARENT_RED_VALUE: {
-            *value = 0;
-            break;
-        }
-        case EGL_TRANSPARENT_GREEN_VALUE: {
-            *value = 0;
-            break;
-        }
-        case EGL_TRANSPARENT_BLUE_VALUE: {
-            *value = 0;
-            break;
-        }
+            return EGL_TRUE;
+        case EGL_SURFACE_TYPE:
+            *value = EGL_WINDOW_BIT | EGL_PBUFFER_BIT;
+            return EGL_TRUE;
+        case EGL_RENDERABLE_TYPE:
+            *value = EGL_OPENGL_ES2_BIT;
+            return EGL_TRUE;
         default:
-            l_error("eglGetConfigAttrib / EGL_BAD_ATTRIBUTE: 0x%x", attribute);
-            return EGL_FALSE;
+            *value = 0;
+            return EGL_TRUE;
     }
-    return EGL_TRUE;
 }
 
 EGLBoolean eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
                            EGLConfig *configs, EGLint config_size,
                            EGLint *num_config) {
-    if (!num_config) {
-        return EGL_BAD_PARAMETER;
-    }
+    (void)dpy;
+    (void)attrib_list;
 
-    if (!configs) {
-        *num_config = 1;
-        return EGL_TRUE;
-    }
+    if (!num_config)
+        return EGL_FALSE;
 
-    *configs = strdup("conf");
     *num_config = 1;
+
+    if (configs && config_size > 0)
+        configs[0] = g_fake_cfg;
 
     return EGL_TRUE;
 }
@@ -286,6 +207,11 @@ EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
 
 EGLBoolean eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read,
                           EGLContext ctx) {
+    (void)draw;
+    (void)read;
+    (void)ctx;
+
+    egl_shim_set_current_display(dpy);
     return EGL_TRUE;
 }
 
@@ -330,18 +256,17 @@ char const * eglQueryString(EGLDisplay display, EGLint name) {
     }
 }
 
-EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig * configs,
-                         EGLint config_size, EGLint * num_config) {
-    if (!num_config) {
-        l_error("eglGetConfigs / EGL_BAD_PARAMETER");
-        return EGL_FALSE;
-    }
+EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig *configs,
+                         EGLint config_size, EGLint *num_config) {
+    (void)display;
 
-    if (configs && config_size > 0) {
-        *configs = strdup("conf");
-    }
+    if (!num_config)
+        return EGL_FALSE;
 
     *num_config = 1;
+
+    if (configs && config_size > 0)
+        configs[0] = g_fake_cfg;
 
     return EGL_TRUE;
 }
