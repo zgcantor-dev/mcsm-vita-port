@@ -190,6 +190,10 @@ target_include_directories(${CMAKE_PROJECT_NAME}
 option(USE_SNDFILE "Link libsndfile (may require mpg123/mp3lame/opus/etc)" ON)
 
 set(AUDIO_LIBS "")
+set(SDL2_LIBS "")
+if (USE_SDL2)
+  list(APPEND SDL2_LIBS SDL2)
+endif()
 if (USE_SNDFILE)
   # Order matters with static libs.
   list(APPEND AUDIO_LIBS
@@ -208,6 +212,7 @@ endif()
 target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
                       OpenSLES
+                      ${SDL2_LIBS}
                       ${AUDIO_LIBS}
                       stdc++
                       vitaGL
