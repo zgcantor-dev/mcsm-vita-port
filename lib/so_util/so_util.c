@@ -386,35 +386,31 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
 
 void reloc_err(uintptr_t got0)
 {
-    // Find to which module this missing symbol belongs
-    int found = 0;
-    so_module *curr = head;
-    while (curr && !found) {
-        for (int i = 0; i < curr->n_data; i++)
-            if ((got0 >= curr->data_base[i]) && (got0 <= (uintptr_t)(curr->data_base[i] + curr->data_size)))
-                found = 1;
-
-        if (!found)
-            curr = curr->next;
-    }
-
-    if (curr) {
-        // Attempt to find symbol name and then display error
+    // Find relocation/module owning this GOT slot and display detailed error.
+    for (so_module *curr = head; curr; curr = curr->next) {
         for (int i = 0; i < curr->num_reldyn + curr->num_relplt; i++) {
             Elf32_Rel *rel = i < curr->num_reldyn ? &curr->reldyn[i] : &curr->relplt[i - curr->num_reldyn];
-            Elf32_Sym *sym = &curr->dynsym[ELF32_R_SYM(rel->r_info)];
             uintptr_t *ptr = (uintptr_t *)(curr->text_base + rel->r_offset);
-
             int type = ELF32_R_TYPE(rel->r_info);
-            switch (type) {
-                case R_ARM_JUMP_SLOT:
-                {
-                    if (got0 == (uintptr_t)ptr) {
-                        fatal_error("Unknown symbol \"%s\" (%p).\n", curr->dynstr + sym->st_name, (void*)got0);
-                    }
-                    break;
-                }
+
+            if (got0 != (uintptr_t)ptr)
+                continue;
+
+            if (type == R_ARM_RELATIVE) {
+                fatal_error("Unexpected R_ARM_RELATIVE relocation hit PLT resolver in %s (type=%d, off=0x%08x, addr=%p).\n",
+                            curr->soname ? curr->soname : "<unnamed>", type, rel->r_offset, (void *)got0);
             }
+
+            if (type == R_ARM_JUMP_SLOT || type == R_ARM_GLOB_DAT || type == R_ARM_ABS32) {
+                int sym_idx = ELF32_R_SYM(rel->r_info);
+                Elf32_Sym *sym = &curr->dynsym[sym_idx];
+                const char *sym_name = (sym_idx == 0 || sym->st_name == 0) ? "???" : (curr->dynstr + sym->st_name);
+                fatal_error("Unknown symbol \"%s\" (%p) in %s (type=%d, off=0x%08x).\n",
+                            sym_name, (void *)got0, curr->soname ? curr->soname : "<unnamed>", type, rel->r_offset);
+            }
+
+            fatal_error("Unknown relocation failure (%p) in %s (type=%d, off=0x%08x).\n",
+                        (void *)got0, curr->soname ? curr->soname : "<unnamed>", type, rel->r_offset);
         }
     }
 
