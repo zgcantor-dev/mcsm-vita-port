@@ -1061,7 +1061,7 @@ so_default_dynlib default_dynlib[] = {
 void *dlsym_soloader(void * handle, const char * symbol) {
     (void)handle;
 
-    void *builtin = builtin_resolve_symbol(symbol);
+    void *builtin = resolve_builtin(symbol);
     if (builtin)
         return builtin;
 

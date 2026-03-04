@@ -43,9 +43,6 @@
 
 extern so_module so_mod;
 
-#ifdef LOAD_SDL2
-static so_module sdl2_mod;
-#endif
 #ifdef LOAD_GAMEENGINE_SO
 static so_module gameengine_mod;
 #endif
@@ -111,6 +108,7 @@ static void configure_system() {
 
 void soloader_init_all() {
     configure_system();
+    l_info("logger initialized");
 
 #ifdef DEBUG_TRACE
     so_set_trace_enabled(1);
@@ -173,5 +171,6 @@ void soloader_init_all() {
     }
 #endif
 
-    l_warn("engine loaded + constructors completed");
+    sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
+    return;
 }

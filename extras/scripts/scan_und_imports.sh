@@ -12,6 +12,6 @@ fi
 for so in "$REF_DIR"/*.so; do
   [ -e "$so" ] || continue
   echo "=== $(basename "$so") ==="
-  "$READELF" -Ws "$so" | awk '$4=="FUNC" && $7=="UND" {print $8}' | sort -u
+  "$READELF" -Ws "$so" | awk '$7=="UND" && $8!="" {print $8}' | sort -u | sed 's/^/UND_IMPORT /'
   echo
  done

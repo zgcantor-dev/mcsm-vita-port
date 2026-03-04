@@ -41,21 +41,16 @@ add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}")
 set(GAMEENGINE_SO "${DATA_PATH}libGameEngine.so" CACHE STRING "Path to libGameEngine.so")
 set(FMOD_SO "${DATA_PATH}libfmod.so" CACHE STRING "Path to libfmod.so")
 set(FMODSTUDIO_SO "${DATA_PATH}libfmodstudio.so" CACHE STRING "Path to libfmodstudio.so")
-set(SDL2_SO "${DATA_PATH}libSDL2.so" CACHE STRING "Path to libSDL2.so")
-
 add_definitions(
   -DGAMEENGINE_SO="${GAMEENGINE_SO}"
   -DFMOD_SO="${FMOD_SO}"
   -DFMODSTUDIO_SO="${FMODSTUDIO_SO}"
-  -DSDL2_SO="${SDL2_SO}"
 )
 
 # Optional runtime-loading switches (only affect code if you use these defines)
 option(LOAD_GAMEENGINE_SO "Load libGameEngine.so at runtime" ON)
 option(LOAD_FMOD "Load libfmod.so at runtime" ON)
 option(LOAD_FMODSTUDIO "Load libfmodstudio.so at runtime (if needed)" ON)
-option(LOAD_SDL2 "Load libSDL2.so at runtime (if needed by dependencies)" ON)
-
 if (LOAD_GAMEENGINE_SO)
   add_definitions(-DLOAD_GAMEENGINE_SO)
 endif()
@@ -65,10 +60,6 @@ endif()
 if (LOAD_FMODSTUDIO)
   add_definitions(-DLOAD_FMODSTUDIO)
 endif()
-if (LOAD_SDL2)
-  add_definitions(-DLOAD_SDL2)
-endif()
-
 option(DEBUG_TRACE "Enable verbose so_loader tracing" ON)
 if (DEBUG_TRACE)
   add_definitions(-DDEBUG_TRACE=1)

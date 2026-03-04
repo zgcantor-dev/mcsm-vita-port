@@ -61,7 +61,7 @@ static builtin_symbol g_builtin_symbols[] = {
     { "clock_gettime", (void *)&clock_gettime_soloader },
 };
 
-void *builtin_resolve_symbol(const char *name) {
+void *resolve_builtin(const char *name) {
     for (unsigned int i = 0; i < sizeof(g_builtin_symbols) / sizeof(g_builtin_symbols[0]); i++) {
         if (strcmp(name, g_builtin_symbols[i].name) == 0)
             return g_builtin_symbols[i].addr;
