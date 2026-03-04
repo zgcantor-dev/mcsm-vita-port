@@ -222,6 +222,10 @@ so_default_dynlib default_dynlib[] = {
 #ifdef USE_SDL2
         { "SDL_GetPerformanceCounter", (uintptr_t)&SDL_GetPerformanceCounter },
         { "SDL_GetPerformanceFrequency", (uintptr_t)&SDL_GetPerformanceFrequency },
+        { "SDL_GetTicks", (uintptr_t)&SDL_GetTicks },
+        { "SDL_GetTicks64", (uintptr_t)&SDL_GetTicks64 },
+        { "SDL_SetHint", (uintptr_t)&SDL_SetHint },
+        { "SDL_GetHint", (uintptr_t)&SDL_GetHint },
 #endif
 
         // ctype
