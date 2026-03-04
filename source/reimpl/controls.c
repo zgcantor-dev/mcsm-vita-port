@@ -55,8 +55,8 @@ void controls_poll() {
     //poll_accel();
 }
 
-SceTouchData touch;
-SceTouchData touch_old;
+static SceTouchData touch;
+static SceTouchData touch_old;
 
 void poll_touch() {
     sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
