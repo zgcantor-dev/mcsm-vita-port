@@ -55,6 +55,7 @@ option(LOAD_GAMEENGINE_SO "Load libGameEngine.so at runtime" ON)
 option(LOAD_FMOD "Load libfmod.so at runtime" ON)
 option(LOAD_FMODSTUDIO "Load libfmodstudio.so at runtime (if needed)" ON)
 option(LOAD_SDL2 "Load libSDL2.so at runtime (if needed by dependencies)" ON)
+option(UNIFIED_SO_NAMESPACE "Resolve symbols in a process-wide namespace across loaded Android .so modules" ON)
 
 if (LOAD_GAMEENGINE_SO)
   add_definitions(-DLOAD_GAMEENGINE_SO)
@@ -67,6 +68,9 @@ if (LOAD_FMODSTUDIO)
 endif()
 if (LOAD_SDL2)
   add_definitions(-DLOAD_SDL2)
+endif()
+if (UNIFIED_SO_NAMESPACE)
+  add_definitions(-DSO_UTIL_FORCE_FLAT_NAMESPACE)
 endif()
 
 # -----------------------------------------------------------------------------

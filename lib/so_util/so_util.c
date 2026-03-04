@@ -360,6 +360,7 @@ int so_relocate(so_module *mod) {
 }
 
 uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
+#ifndef SO_UTIL_FORCE_FLAT_NAMESPACE
     // First pass: strict DT_NEEDED -> DT_SONAME resolution.
     for (int i = 0; i < mod->num_dynamic; i++) {
         switch (mod->dynamic[i].d_tag) {
@@ -382,9 +383,11 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
                 break;
         }
     }
+#endif
 
-    // Fallback pass: some Android libs have mismatched/empty SONAMEs on Vita.
-    // Search all already loaded modules for the symbol to preserve cross-library interaction.
+    // Flat/global pass: search all loaded modules for the symbol.
+    // This emulates a single global namespace so multiple .so files can interoperate
+    // even when DT_NEEDED / SONAME metadata is incomplete or mismatched.
     for (so_module *curr = head; curr; curr = curr->next) {
         if (curr == mod)
             continue;
