@@ -334,7 +334,7 @@ int so_mem_load(so_module *mod, void *buffer, size_t so_size, uintptr_t load_add
 
     memset(mod, 0, sizeof(so_module));
 
-    TRACE_LOG("LOAD_BEGIN %s path=<memory>", so_mod_name(mod));
+    TRACE_LOG("LOAD_BEGIN <memory> path=<memory>");
 
     so_blockid = sceKernelAllocMemBlock("so block", SCE_KERNEL_MEMBLOCK_TYPE_USER_RW, (so_size + 0xfff) & ~0xfff, NULL);
     if (so_blockid < 0)
@@ -358,7 +358,7 @@ int so_file_load(so_module *mod, const char *filename, uintptr_t load_addr) {
     memset(mod, 0, sizeof(so_module));
     mod->resolved_path = filename;
 
-    TRACE_LOG("LOAD_BEGIN %s path=%s", so_mod_name(mod), filename);
+    TRACE_LOG("LOAD_BEGIN %s path=%s", filename, filename);
 
     SceUID fd = sceIoOpen(filename, SCE_O_RDONLY, 0);
     if (fd < 0)

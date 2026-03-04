@@ -43,9 +43,6 @@
 
 extern so_module so_mod;
 
-#ifdef LOAD_SDL2
-static so_module sdl2_mod;
-#endif
 #ifdef LOAD_GAMEENGINE_SO
 static so_module gameengine_mod;
 #endif
