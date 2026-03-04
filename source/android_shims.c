@@ -39,6 +39,77 @@ uint32_t SDL_GetTicks(void) {
 uint64_t SDL_GetTicks64(void) {
     return shim_perf_counter() / 1000ULL;
 }
+
+typedef int SDL_bool;
+
+#ifndef SDL_FALSE
+#define SDL_FALSE 0
+#endif
+
+#ifndef SDL_TRUE
+#define SDL_TRUE 1
+#endif
+
+#ifndef SDL_MAX_HINTS
+#define SDL_MAX_HINTS 64
+#endif
+
+#ifndef SDL_MAX_HINT_KEY
+#define SDL_MAX_HINT_KEY 64
+#endif
+
+#ifndef SDL_MAX_HINT_VAL
+#define SDL_MAX_HINT_VAL 128
+#endif
+
+typedef struct {
+    char key[SDL_MAX_HINT_KEY];
+    char val[SDL_MAX_HINT_VAL];
+    int used;
+} hint_entry;
+
+static hint_entry g_hints[SDL_MAX_HINTS];
+
+SDL_bool SDL_SetHint(const char *name, const char *value) {
+    if (!name || !*name)
+        return SDL_FALSE;
+
+    if (!value)
+        value = "";
+
+    for (int i = 0; i < SDL_MAX_HINTS; i++) {
+        if (g_hints[i].used && strncmp(g_hints[i].key, name, SDL_MAX_HINT_KEY) == 0) {
+            strncpy(g_hints[i].val, value, SDL_MAX_HINT_VAL - 1);
+            g_hints[i].val[SDL_MAX_HINT_VAL - 1] = '\0';
+            return SDL_TRUE;
+        }
+    }
+
+    for (int i = 0; i < SDL_MAX_HINTS; i++) {
+        if (!g_hints[i].used) {
+            g_hints[i].used = 1;
+            strncpy(g_hints[i].key, name, SDL_MAX_HINT_KEY - 1);
+            g_hints[i].key[SDL_MAX_HINT_KEY - 1] = '\0';
+            strncpy(g_hints[i].val, value, SDL_MAX_HINT_VAL - 1);
+            g_hints[i].val[SDL_MAX_HINT_VAL - 1] = '\0';
+            return SDL_TRUE;
+        }
+    }
+
+    return SDL_TRUE;
+}
+
+const char *SDL_GetHint(const char *name) {
+    if (!name || !*name)
+        return NULL;
+
+    for (int i = 0; i < SDL_MAX_HINTS; i++) {
+        if (g_hints[i].used && strncmp(g_hints[i].key, name, SDL_MAX_HINT_KEY) == 0)
+            return g_hints[i].val;
+    }
+
+    return NULL;
+}
 #endif
 
 void *SDL_AndroidGetJNIEnv(void) {
@@ -81,6 +152,11 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
 #ifdef USE_SDL2
     { "SDL_SetMainReady", (void *)&SDL_SetMainReady },
+    { "SDL_SetHint", (void *)&SDL_SetHint },
+    { "SDL_GetHint", (void *)&SDL_GetHint },
+#else
+    { "SDL_SetHint", (void *)&SDL_SetHint },
+    { "SDL_GetHint", (void *)&SDL_GetHint },
 #endif
     { "__android_log_print", (void *)&__android_log_print },
     { "clock_gettime", (void *)&clock_gettime_soloader },
