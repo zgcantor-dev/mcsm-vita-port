@@ -359,6 +359,19 @@ int so_relocate(so_module *mod) {
     return 0;
 }
 
+uintptr_t so_symbol_global(so_module *requester, const char *symbol, int include_requester) {
+    for (so_module *curr = head; curr; curr = curr->next) {
+        if (!include_requester && curr == requester)
+            continue;
+
+        uintptr_t link = so_symbol(curr, symbol);
+        if (link)
+            return link;
+    }
+
+    return 0;
+}
+
 uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
     // First pass: strict DT_NEEDED -> DT_SONAME resolution.
     for (int i = 0; i < mod->num_dynamic; i++) {
@@ -366,14 +379,12 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
             case DT_NEEDED:
             {
                 const char *needed = mod->dynstr + mod->dynamic[i].d_un.d_ptr;
-                so_module *curr = head;
-                while (curr) {
+                for (so_module *curr = head; curr; curr = curr->next) {
                     if (curr != mod && curr->soname && strcmp(curr->soname, needed) == 0) {
                         uintptr_t link = so_symbol(curr, symbol);
                         if (link)
                             return link;
                     }
-                    curr = curr->next;
                 }
 
                 break;
@@ -383,18 +394,10 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
         }
     }
 
-    // Fallback pass: some Android libs have mismatched/empty SONAMEs on Vita.
-    // Search all already loaded modules for the symbol to preserve cross-library interaction.
-    for (so_module *curr = head; curr; curr = curr->next) {
-        if (curr == mod)
-            continue;
-
-        uintptr_t link = so_symbol(curr, symbol);
-        if (link)
-            return link;
-    }
-
-    return 0;
+    // Flat/global pass: search all loaded modules for the symbol.
+    // This emulates a single global namespace so multiple .so files can interoperate
+    // even when DT_NEEDED / SONAME metadata is incomplete or mismatched.
+    return so_symbol_global(mod, symbol, 0);
 }
 
 void reloc_err(uintptr_t got0)
