@@ -8,6 +8,10 @@
 
 #include "reimpl/sys.h"
 
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+#endif
+
 static const char *g_data_root = "ux0:data/mcsm";
 
 void android_shims_init(const char *data_root) {
@@ -47,6 +51,20 @@ int SDL_AndroidGetExternalStorageState(void) {
     return 1;
 }
 
+const char *android_shims_get_data_root(void) {
+    return g_data_root;
+}
+
+int SDL_Android_Init(void) {
+    return 0;
+}
+
+void SDL_SetMainReady_REAL(void) {
+#ifdef USE_SDL2
+    SDL_SetMainReady();
+#endif
+}
+
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
@@ -57,6 +75,11 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_AndroidGetJNIEnv", (void *)&SDL_AndroidGetJNIEnv },
     { "SDL_AndroidGetInternalStoragePath", (void *)&SDL_AndroidGetInternalStoragePath },
     { "SDL_AndroidGetExternalStorageState", (void *)&SDL_AndroidGetExternalStorageState },
+    { "SDL_Android_Init", (void *)&SDL_Android_Init },
+    { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
+#ifdef USE_SDL2
+    { "SDL_SetMainReady", (void *)&SDL_SetMainReady },
+#endif
     { "__android_log_print", (void *)&__android_log_print },
     { "clock_gettime", (void *)&clock_gettime_soloader },
 };
