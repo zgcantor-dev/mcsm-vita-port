@@ -23,6 +23,7 @@ static uint64_t shim_perf_counter(void) {
     return sceKernelGetProcessTimeWide();
 }
 
+#ifndef USE_SDL2
 uint64_t SDL_GetPerformanceCounter(void) {
     return shim_perf_counter();
 }
@@ -38,6 +39,7 @@ uint32_t SDL_GetTicks(void) {
 uint64_t SDL_GetTicks64(void) {
     return shim_perf_counter() / 1000ULL;
 }
+#endif
 
 void *SDL_AndroidGetJNIEnv(void) {
     return NULL;
