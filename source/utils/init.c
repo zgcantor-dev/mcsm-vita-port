@@ -111,6 +111,7 @@ static void configure_system() {
 
 void soloader_init_all() {
     configure_system();
+    l_info("logger initialized");
 
 #ifdef DEBUG_TRACE
     so_set_trace_enabled(1);
@@ -173,5 +174,6 @@ void soloader_init_all() {
     }
 #endif
 
-    l_warn("engine loaded + constructors completed");
+    sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
+    return;
 }

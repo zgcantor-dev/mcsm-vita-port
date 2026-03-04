@@ -334,6 +334,8 @@ int so_mem_load(so_module *mod, void *buffer, size_t so_size, uintptr_t load_add
 
     memset(mod, 0, sizeof(so_module));
 
+    TRACE_LOG("LOAD_BEGIN %s path=<memory>", so_mod_name(mod));
+
     so_blockid = sceKernelAllocMemBlock("so block", SCE_KERNEL_MEMBLOCK_TYPE_USER_RW, (so_size + 0xfff) & ~0xfff, NULL);
     if (so_blockid < 0)
         return so_blockid;
@@ -343,9 +345,9 @@ int so_mem_load(so_module *mod, void *buffer, size_t so_size, uintptr_t load_add
 
     int rc = _so_load(mod, so_blockid, so_data, load_addr);
     if (rc == 0)
-        TRACE_LOG("MODULE_LOAD_END module=%s path=<memory> base=0x%08X", so_mod_name(mod), (unsigned int)mod->text_base);
+        TRACE_LOG("LOAD_END %s base=0x%08X", so_mod_name(mod), (unsigned int)mod->text_base);
     else
-        TRACE_LOG("MODULE_LOAD_FAIL path=<memory> err=%d", rc);
+        TRACE_LOG("LOAD_FAIL <memory> err=%d", rc);
     return rc;
 }
 
@@ -356,7 +358,7 @@ int so_file_load(so_module *mod, const char *filename, uintptr_t load_addr) {
     memset(mod, 0, sizeof(so_module));
     mod->resolved_path = filename;
 
-    TRACE_LOG("MODULE_LOAD_START path=%s load_addr=0x%08X", filename, (unsigned int)load_addr);
+    TRACE_LOG("LOAD_BEGIN %s path=%s", so_mod_name(mod), filename);
 
     SceUID fd = sceIoOpen(filename, SCE_O_RDONLY, 0);
     if (fd < 0)
@@ -376,9 +378,9 @@ int so_file_load(so_module *mod, const char *filename, uintptr_t load_addr) {
 
     int rc = _so_load(mod, so_blockid, so_data, load_addr);
     if (rc == 0)
-        TRACE_LOG("MODULE_LOAD_END module=%s path=%s base=0x%08X", so_mod_name(mod), filename, (unsigned int)mod->text_base);
+        TRACE_LOG("LOAD_END %s base=0x%08X", so_mod_name(mod), (unsigned int)mod->text_base);
     else
-        TRACE_LOG("MODULE_LOAD_FAIL path=%s err=%d", filename, rc);
+        TRACE_LOG("LOAD_FAIL %s err=%d", filename, rc);
     return rc;
 }
 
@@ -399,47 +401,57 @@ int so_relocate(so_module *mod) {
         }
     }
 
-    TRACE_LOG("RELOC_SUMMARY %s total=%d RELATIVE=%d JUMP_SLOT=%d GLOB_DAT=%d ABS32=%d OTHER=%d",
-              so_mod_name(mod), total, rel_relative, rel_jump_slot, rel_glob_dat, rel_abs32, rel_other);
+    TRACE_LOG("RELOC_SUMMARY %s total=%d rel=%d plt=%d", so_mod_name(mod), total, mod->num_reldyn, mod->num_relplt);
+    TRACE_LOG("types: RELATIVE=%d JUMP_SLOT=%d GLOB_DAT=%d ABS32=%d OTHER=%d", rel_relative, rel_jump_slot, rel_glob_dat, rel_abs32, rel_other);
 
     for (int i = 0; i < total; i++) {
         Elf32_Rel *rel = i < mod->num_reldyn ? &mod->reldyn[i] : &mod->relplt[i - mod->num_reldyn];
-        int symidx = ELF32_R_SYM(rel->r_info);
-        Elf32_Sym *sym = &mod->dynsym[symidx];
-        uintptr_t *ptr = (uintptr_t *)(mod->text_base + rel->r_offset);
-
+        uintptr_t *where = (uintptr_t *)(mod->text_base + rel->r_offset);
         int type = ELF32_R_TYPE(rel->r_info);
-        if ((i & 0xFFF) == 0) {
-            TRACE_LOG("RELOC_PROGRESS %s %d/%d type=%d r_offset=0x%08X", so_mod_name(mod), i, total, type, rel->r_offset);
-        }
+
+        if ((i & 0xFFF) == 0)
+            TRACE_LOG("RELOC_PROGRESS %s i=%d/%d type=%d off=0x%08X", so_mod_name(mod), i, total, type, rel->r_offset);
 
         switch (type) {
-            case R_ARM_ABS32:
+            case R_ARM_ABS32: {
+                int symidx = ELF32_R_SYM(rel->r_info);
+                Elf32_Sym *sym = &mod->dynsym[symidx];
                 if (sym->st_shndx != SHN_UNDEF) {
-                    val = *ptr + mod->text_base + sym->st_value;
-                    kuKernelCpuUnrestrictedMemcpy(ptr, &val, sizeof(uintptr_t));
+                    val = *where + mod->text_base + sym->st_value;
+                    kuKernelCpuUnrestrictedMemcpy(where, &val, sizeof(uintptr_t));
                 }
                 break;
+            }
             case R_ARM_RELATIVE:
-                val = mod->text_base + *ptr;
-                kuKernelCpuUnrestrictedMemcpy(ptr, &val, sizeof(uintptr_t));
+                val = mod->text_base + *where;
+                kuKernelCpuUnrestrictedMemcpy(where, &val, sizeof(uintptr_t));
                 break;
             case R_ARM_GLOB_DAT:
-            case R_ARM_JUMP_SLOT:
+            case R_ARM_JUMP_SLOT: {
+                int symidx = ELF32_R_SYM(rel->r_info);
+                Elf32_Sym *sym = &mod->dynsym[symidx];
                 if (sym->st_shndx != SHN_UNDEF) {
                     val = mod->text_base + sym->st_value;
-                    kuKernelCpuUnrestrictedMemcpy(ptr, &val, sizeof(uintptr_t));
+                    kuKernelCpuUnrestrictedMemcpy(where, &val, sizeof(uintptr_t));
                 }
                 break;
-            default:
+            }
+            default: {
+                int symidx = ELF32_R_SYM(rel->r_info);
+                Elf32_Sym *sym = &mod->dynsym[symidx];
+                const char *sym_name = (symidx == 0 || sym->st_name == 0) ? "???" : (mod->dynstr + sym->st_name);
+                TRACE_LOG("RELOC_FAIL %s type=%d symidx=%d sym=%s off=0x%08X info=0x%08X",
+                          so_mod_name(mod), type, symidx, sym_name, rel->r_offset, rel->r_info);
                 fatal_error("Relocation apply failure module=%s type=%d symidx=%d symname=%s r_offset=0x%08X r_info=0x%08X", so_mod_name(mod),
-                            type, symidx, (symidx == 0 || sym->st_name == 0) ? "???" : (mod->dynstr + sym->st_name), rel->r_offset, rel->r_info);
+                            type, symidx, sym_name, rel->r_offset, rel->r_info);
                 break;
+            }
         }
     }
 
     return 0;
 }
+
 
 
 uintptr_t so_symbol_global(so_module *requester, const char *symbol, int include_requester) {
@@ -474,7 +486,7 @@ static void log_searched_namespaces(so_module *mod) {
 }
 
 uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
-    uintptr_t builtin = (uintptr_t)builtin_resolve_symbol(symbol);
+    uintptr_t builtin = (uintptr_t)resolve_builtin(symbol);
     if (builtin)
         return builtin;
 
@@ -489,7 +501,7 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
                 if (link) {
 #if TRACE_PLT_BINDINGS
                     if (mod->soname && curr->soname && strcmp(mod->soname, "libmain.so") == 0 && strcmp(curr->soname, "libGameEngine.so") == 0) {
-                        TRACE_LOG("PLT_BIND importer=%s provider=%s symbol=%s addr=0x%08X", so_mod_name(mod), so_mod_name(curr), symbol, (unsigned int)link);
+                        TRACE_LOG("PLT_BIND %s sym=%s -> 0x%08X from %s", so_mod_name(mod), symbol, (unsigned int)link, so_mod_name(curr));
                     }
 #endif
                     return link;
@@ -505,7 +517,7 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
         if (link) {
 #if TRACE_PLT_BINDINGS
             if (mod->soname && curr->soname && strcmp(mod->soname, "libmain.so") == 0 && strcmp(curr->soname, "libGameEngine.so") == 0) {
-                TRACE_LOG("PLT_BIND importer=%s provider=%s symbol=%s addr=0x%08X", so_mod_name(mod), so_mod_name(curr), symbol, (unsigned int)link);
+                TRACE_LOG("PLT_BIND %s sym=%s -> 0x%08X from %s", so_mod_name(mod), symbol, (unsigned int)link, so_mod_name(curr));
             }
 #endif
             return link;
@@ -596,8 +608,12 @@ int so_resolve(so_module *mod, so_default_dynlib *default_dynlib, int size_defau
 
                     if (!resolved) {
                         log_searched_namespaces(mod);
+                        int symidx = ELF32_R_SYM(rel->r_info);
+                        const char *sym_name = (symidx == 0 || sym->st_name == 0) ? "???" : (mod->dynstr + sym->st_name);
+                        TRACE_LOG("RELOC_FAIL %s type=%d symidx=%d sym=%s off=0x%08X info=0x%08X",
+                                  so_mod_name(mod), type, symidx, sym_name, rel->r_offset, rel->r_info);
                         sceClibPrintf("Unresolved import module=%s type=%d symidx=%d symname=%s r_offset=0x%08X r_info=0x%08X\n",
-                                      so_mod_name(mod), type, ELF32_R_SYM(rel->r_info), mod->dynstr + sym->st_name, rel->r_offset, rel->r_info);
+                                      so_mod_name(mod), type, symidx, sym_name, rel->r_offset, rel->r_info);
                         if (type == R_ARM_JUMP_SLOT)
                             *ptr = (uintptr_t)&plt0_stub;
                     }
@@ -651,7 +667,7 @@ int so_resolve_with_dummy(so_module *mod, so_default_dynlib *default_dynlib, int
 
 void so_initialize(so_module *mod) {
     if (mod->init_func) {
-        TRACE_LOG("INIT_ENTER %s .init fn=%p off=0x%08X", so_mod_name(mod), mod->init_func,
+        TRACE_LOG("INIT_CALL %s .init fn=%p off=0x%08X", so_mod_name(mod), mod->init_func,
                   (unsigned int)((uintptr_t)mod->init_func - mod->text_base));
         mod->init_func();
         TRACE_LOG("INIT_LEAVE %s .init fn=%p off=0x%08X", so_mod_name(mod), mod->init_func,
