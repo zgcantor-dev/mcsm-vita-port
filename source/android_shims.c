@@ -152,8 +152,6 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
 #ifdef USE_SDL2
     { "SDL_SetMainReady", (void *)&SDL_SetMainReady },
-    { "SDL_SetHint", (void *)&SDL_SetHint },
-    { "SDL_GetHint", (void *)&SDL_GetHint },
 #else
     { "SDL_SetHint", (void *)&SDL_SetHint },
     { "SDL_GetHint", (void *)&SDL_GetHint },
