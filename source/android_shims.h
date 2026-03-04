@@ -13,7 +13,7 @@ typedef struct {
 } builtin_symbol;
 
 void android_shims_init(const char *data_root);
-void *builtin_resolve_symbol(const char *name);
+void *resolve_builtin(const char *name);
 
 #ifdef __cplusplus
 }
