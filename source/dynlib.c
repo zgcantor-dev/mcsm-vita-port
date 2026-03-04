@@ -47,6 +47,10 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+#endif
+
 #include "reimpl/errno.h"
 #include "reimpl/io.h"
 #include "reimpl/log.h"
@@ -214,7 +218,10 @@ so_default_dynlib default_dynlib[] = {
         { "__system_property_get", (uintptr_t)&__system_property_get_soloader },
         { "__assert2", (uintptr_t)&ret0 }, // TODO: stub/impl
         { "dl_unwind_find_exidx", (uintptr_t)&ret0 }, // TODO: stub/impl
-
+#ifdef USE_SDL2
+        { "SDL_GetPerformanceCounter", (uintptr_t)&SDL_GetPerformanceCounter },
+        { "SDL_GetPerformanceFrequency", (uintptr_t)&SDL_GetPerformanceFrequency },
+#endif
 
         // ctype
         { "_ctype_", (uintptr_t)&BIONIC_ctype_ },

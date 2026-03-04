@@ -360,13 +360,15 @@ int so_relocate(so_module *mod) {
 }
 
 uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
+    // First pass: strict DT_NEEDED -> DT_SONAME resolution.
     for (int i = 0; i < mod->num_dynamic; i++) {
         switch (mod->dynamic[i].d_tag) {
             case DT_NEEDED:
             {
+                const char *needed = mod->dynstr + mod->dynamic[i].d_un.d_ptr;
                 so_module *curr = head;
                 while (curr) {
-                    if (curr != mod && strcmp(curr->soname, mod->dynstr + mod->dynamic[i].d_un.d_ptr) == 0) {
+                    if (curr != mod && curr->soname && strcmp(curr->soname, needed) == 0) {
                         uintptr_t link = so_symbol(curr, symbol);
                         if (link)
                             return link;
@@ -379,6 +381,17 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
             default:
                 break;
         }
+    }
+
+    // Fallback pass: some Android libs have mismatched/empty SONAMEs on Vita.
+    // Search all already loaded modules for the symbol to preserve cross-library interaction.
+    for (so_module *curr = head; curr; curr = curr->next) {
+        if (curr == mod)
+            continue;
+
+        uintptr_t link = so_symbol(curr, symbol);
+        if (link)
+            return link;
     }
 
     return 0;
