@@ -34,6 +34,9 @@
 
 extern so_module so_mod;
 
+#ifdef LOAD_SDL2
+static so_module sdl2_mod;
+#endif
 #ifdef LOAD_GAMEENGINE_SO
 static so_module gameengine_mod;
 #endif
@@ -100,6 +103,11 @@ void soloader_init_all() {
     load_address += LOAD_ADDRESS_STEP;
 #endif
 
+#ifdef LOAD_SDL2
+    load_so_or_fail(&sdl2_mod, SDL2_SO, "libSDL2.so", load_address);
+    load_address += LOAD_ADDRESS_STEP;
+#endif
+
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
@@ -118,6 +126,10 @@ void soloader_init_all() {
 #ifdef LOAD_FMODSTUDIO
     so_relocate(&fmodstudio_mod);
     resolve_imports(&fmodstudio_mod);
+#endif
+#ifdef LOAD_SDL2
+    so_relocate(&sdl2_mod);
+    resolve_imports(&sdl2_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     so_relocate(&gameengine_mod);
@@ -139,6 +151,10 @@ void soloader_init_all() {
 #ifdef LOAD_FMODSTUDIO
     so_flush_caches(&fmodstudio_mod);
     so_initialize(&fmodstudio_mod);
+#endif
+#ifdef LOAD_SDL2
+    so_flush_caches(&sdl2_mod);
+    so_initialize(&sdl2_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     so_flush_caches(&gameengine_mod);
