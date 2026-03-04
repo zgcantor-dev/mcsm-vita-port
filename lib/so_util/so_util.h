@@ -32,6 +32,7 @@ typedef struct so_module {
     Elf32_Rel *reldyn;
     Elf32_Rel *relplt;
 
+    int (*init_func)(void);
     int (** init_array)(void);
     uint32_t *hash;
 
@@ -44,6 +45,7 @@ typedef struct so_module {
     char *soname;
     char *shstr;
     char *dynstr;
+    const char *resolved_path;
 } so_module;
 
 typedef struct {
@@ -65,6 +67,9 @@ void so_symbol_fix_ldmia(so_module *mod, const char *symbol);
 void so_initialize(so_module *mod);
 uintptr_t so_symbol(so_module *mod, const char *symbol);
 uintptr_t so_symbol_global(so_module *requester, const char *symbol, int include_requester);
+void so_set_trace_enabled(int enabled);
+int so_trace_enabled(void);
+void so_log_needed_tree(so_module *mod, int depth);
 
 #define SO_CONTINUE(type, h, ...) ({ \
   kuKernelCpuUnrestrictedMemcpy((void *)h.addr, h.orig_instr, sizeof(h.orig_instr)); \

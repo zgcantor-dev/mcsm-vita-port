@@ -60,6 +60,7 @@
 #include "reimpl/egl.h"
 #include "reimpl/time64.h"
 #include "reimpl/asset_manager.h"
+#include "android_shims.h"
 
 const unsigned int __page_size = PAGE_SIZE;
 
@@ -1059,6 +1060,10 @@ so_default_dynlib default_dynlib[] = {
 
 void *dlsym_soloader(void * handle, const char * symbol) {
     (void)handle;
+
+    void *builtin = builtin_resolve_symbol(symbol);
+    if (builtin)
+        return builtin;
 
     uintptr_t link = so_symbol_global(NULL, symbol, 1);
     if (link)

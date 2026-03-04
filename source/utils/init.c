@@ -28,9 +28,18 @@
 #include <so_util/so_util.h>
 #include <fios/fios.h>
 
-// Base address for the Android .so to be loaded at
+#include "android_shims.h"
+
 #define LOAD_ADDRESS 0x98000000
 #define LOAD_ADDRESS_STEP 0x02000000
+
+#ifndef ENGINE_DATA_ROOT
+#define ENGINE_DATA_ROOT "ux0:data/mcsm"
+#endif
+
+#ifndef ENGINE_ENTRYPOINT
+#define ENGINE_ENTRYPOINT "EngineMain"
+#endif
 
 extern so_module so_mod;
 
@@ -46,6 +55,9 @@ static so_module fmod_mod;
 #ifdef LOAD_FMODSTUDIO
 static so_module fmodstudio_mod;
 #endif
+#ifdef LOAD_MAIN_SO_FOR_TRACE
+static so_module main_trace_mod;
+#endif
 
 static void load_so_or_fail(so_module *mod, const char *path, const char *name, uintptr_t load_address) {
     if (!file_exists(path)) {
@@ -58,11 +70,18 @@ static void load_so_or_fail(so_module *mod, const char *path, const char *name, 
         fatal_error("Error: could not load %s.", path);
     }
 
+    so_log_needed_tree(mod, 1);
     l_success("Loaded %s.", name);
 }
 
-void soloader_init_all() {
-	// Launch `app0:configurator.bin` on `-config` init param
+static void relocate_resolve_init(so_module *mod) {
+    so_relocate(mod);
+    resolve_imports(mod);
+    so_flush_caches(mod);
+    so_initialize(mod);
+}
+
+static void configure_system() {
     sceAppUtilInit(&(SceAppUtilInitParam){}, &(SceAppUtilBootParam){});
     SceAppUtilAppEventParam eventParam;
     sceClibMemset(&eventParam, 0, sizeof(SceAppUtilAppEventParam));
@@ -74,7 +93,6 @@ void soloader_init_all() {
             sceAppMgrLoadExec("app0:/configurator.bin", NULL, NULL);
     }
 
-    // Set default overclock values
     scePowerSetArmClockFrequency(444);
     scePowerSetBusClockFrequency(222);
     scePowerSetGpuClockFrequency(222);
@@ -89,7 +107,16 @@ void soloader_init_all() {
         l_fatal("kubridge is not loaded.");
         fatal_error("Error: kubridge.skprx is not installed.");
     }
-    l_success("kubridge check passed.");
+}
+
+void soloader_init_all() {
+    configure_system();
+
+#ifdef DEBUG_TRACE
+    so_set_trace_enabled(1);
+#endif
+
+    android_shims_init(ENGINE_DATA_ROOT);
 
     uintptr_t load_address = LOAD_ADDRESS;
 
@@ -97,80 +124,54 @@ void soloader_init_all() {
     load_so_or_fail(&fmod_mod, FMOD_SO, "libfmod.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
 #endif
-
 #ifdef LOAD_FMODSTUDIO
     load_so_or_fail(&fmodstudio_mod, FMODSTUDIO_SO, "libfmodstudio.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
 #endif
-
-#ifdef LOAD_SDL2
-    load_so_or_fail(&sdl2_mod, SDL2_SO, "libSDL2.so", load_address);
-    load_address += LOAD_ADDRESS_STEP;
-#endif
-
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
 #endif
+#ifdef LOAD_MAIN_SO_FOR_TRACE
+    load_so_or_fail(&main_trace_mod, SO_PATH, "libmain.so(trace)", load_address);
+    load_address += LOAD_ADDRESS_STEP;
+#endif
 
-    load_so_or_fail(&so_mod, SO_PATH, "main game .so", load_address);
+#ifdef LOAD_GAMEENGINE_SO
+    so_mod = gameengine_mod;
+#endif
 
-    settings_load();
-    l_success("Settings loaded.");
-
-    // Relocate and resolve dependencies first, then the main game module.
 #ifdef LOAD_FMOD
-    so_relocate(&fmod_mod);
-    resolve_imports(&fmod_mod);
+    relocate_resolve_init(&fmod_mod);
 #endif
 #ifdef LOAD_FMODSTUDIO
-    so_relocate(&fmodstudio_mod);
-    resolve_imports(&fmodstudio_mod);
-#endif
-#ifdef LOAD_SDL2
-    so_relocate(&sdl2_mod);
-    resolve_imports(&sdl2_mod);
+    relocate_resolve_init(&fmodstudio_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
-    so_relocate(&gameengine_mod);
-    resolve_imports(&gameengine_mod);
+    relocate_resolve_init(&gameengine_mod);
+#endif
+#ifdef LOAD_MAIN_SO_FOR_TRACE
+    relocate_resolve_init(&main_trace_mod);
 #endif
 
-    so_relocate(&so_mod);
-    resolve_imports(&so_mod);
-    l_success("SOs relocated and imports resolved.");
-
-    so_patch();
-    l_success("SO patched.");
-
-    // Init order matches load order so dependent constructors run first.
-#ifdef LOAD_FMOD
-    so_flush_caches(&fmod_mod);
-    so_initialize(&fmod_mod);
-#endif
-#ifdef LOAD_FMODSTUDIO
-    so_flush_caches(&fmodstudio_mod);
-    so_initialize(&fmodstudio_mod);
-#endif
-#ifdef LOAD_SDL2
-    so_flush_caches(&sdl2_mod);
-    so_initialize(&sdl2_mod);
-#endif
-#ifdef LOAD_GAMEENGINE_SO
-    so_flush_caches(&gameengine_mod);
-    so_initialize(&gameengine_mod);
-#endif
-
-    so_flush_caches(&so_mod);
-    so_initialize(&so_mod);
-    l_success("SO caches flushed and modules initialized.");
+    l_success("Engine libraries loaded + initialized.");
 
     gl_preload();
-    l_success("OpenGL preloaded.");
-
     jni_init();
-    l_success("FalsoJNI initialized.");
-
     controls_init();
-    l_success("Controls initialized.");
+
+#ifdef LOAD_GAMEENGINE_SO
+    const char *candidates[] = { ENGINE_ENTRYPOINT, "EngineMain", "GameMain", "AppMain" };
+    for (unsigned int i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        void (*entry_fn)(void) = (void *)so_symbol(&gameengine_mod, candidates[i]);
+        if (!entry_fn)
+            continue;
+
+        l_info("Calling engine entrypoint: %s", candidates[i]);
+        entry_fn();
+        return;
+    }
+#endif
+
+    l_warn("engine loaded + constructors completed");
 }
