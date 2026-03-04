@@ -154,6 +154,7 @@ add_executable(${CMAKE_PROJECT_NAME}
                source/dynlib.c
                source/java.c
                source/android_shims.c
+               source/engine_bootstrap.c
                source/patch.c
                source/reimpl/bits/_ctype.c
                source/reimpl/controls.c

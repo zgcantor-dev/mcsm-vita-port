@@ -13,6 +13,9 @@ typedef struct {
 } builtin_symbol;
 
 void android_shims_init(const char *data_root);
+const char *android_shims_get_data_root(void);
+int SDL_Android_Init(void);
+void SDL_SetMainReady_REAL(void);
 void *resolve_builtin(const char *name);
 
 #ifdef __cplusplus

@@ -524,6 +524,7 @@ uintptr_t so_resolve_link(so_module *mod, const char *symbol) {
         }
     }
 
+    TRACE_LOG("UNRESOLVED %s sym=%s", so_mod_name(mod), symbol);
     return 0;
 }
 

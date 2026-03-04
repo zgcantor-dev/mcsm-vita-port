@@ -29,17 +29,11 @@
 #include <fios/fios.h>
 
 #include "android_shims.h"
+#include "engine_bootstrap.h"
 
 #define LOAD_ADDRESS 0x98000000
 #define LOAD_ADDRESS_STEP 0x02000000
 
-#ifndef ENGINE_DATA_ROOT
-#define ENGINE_DATA_ROOT "ux0:data/mcsm"
-#endif
-
-#ifndef ENGINE_ENTRYPOINT
-#define ENGINE_ENTRYPOINT "EngineMain"
-#endif
 
 extern so_module so_mod;
 
@@ -114,7 +108,7 @@ void soloader_init_all() {
     so_set_trace_enabled(1);
 #endif
 
-    android_shims_init(ENGINE_DATA_ROOT);
+    android_shims_init(DATA_PATH);
 
     uintptr_t load_address = LOAD_ADDRESS;
 
@@ -159,16 +153,8 @@ void soloader_init_all() {
     controls_init();
 
 #ifdef LOAD_GAMEENGINE_SO
-    const char *candidates[] = { ENGINE_ENTRYPOINT, "EngineMain", "GameMain", "AppMain" };
-    for (unsigned int i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
-        void (*entry_fn)(void) = (void *)so_symbol(&gameengine_mod, candidates[i]);
-        if (!entry_fn)
-            continue;
-
-        l_info("Calling engine entrypoint: %s", candidates[i]);
-        entry_fn();
-        return;
-    }
+    start_engine_via_libGameEngine();
+    return;
 #endif
 
     sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
