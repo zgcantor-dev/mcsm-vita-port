@@ -69,6 +69,21 @@ if (LOAD_SDL2)
   add_definitions(-DLOAD_SDL2)
 endif()
 
+option(DEBUG_TRACE "Enable verbose so_loader tracing" ON)
+if (DEBUG_TRACE)
+  add_definitions(-DDEBUG_TRACE=1)
+endif()
+
+option(LOAD_MAIN_SO_FOR_TRACE "Load libmain.so only for trace/binding insights" OFF)
+if (LOAD_MAIN_SO_FOR_TRACE)
+  add_definitions(-DLOAD_MAIN_SO_FOR_TRACE)
+endif()
+
+option(TRACE_PLT_BINDINGS "Trace libmain -> libGameEngine PLT bindings" OFF)
+if (TRACE_PLT_BINDINGS)
+  add_definitions(-DTRACE_PLT_BINDINGS=1)
+endif()
+
 # -----------------------------------------------------------------------------
 # Telltale OBB / TTARCH notes
 # -----------------------------------------------------------------------------
@@ -147,6 +162,7 @@ add_executable(${CMAKE_PROJECT_NAME}
                source/main.c
                source/dynlib.c
                source/java.c
+               source/android_shims.c
                source/patch.c
                source/reimpl/bits/_ctype.c
                source/reimpl/controls.c

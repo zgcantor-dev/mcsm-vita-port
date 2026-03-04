@@ -1,11 +1,7 @@
 #include "utils/init.h"
-#include "utils/glutil.h"
 
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
-
-#include <falso_jni/FalsoJNI.h>
-#include <so_util/so_util.h>
 
 #include "reimpl/controls.h"
 
@@ -19,35 +15,25 @@ so_module so_mod;
 
 int main() {
     soloader_init_all();
-
-    int (*JNI_OnLoad)(void *jvm) = (void *)so_symbol(&so_mod, "JNI_OnLoad");
-    if (!JNI_OnLoad) {
-        sceClibPrintf("[SOLOADER] so_symbol FAILED for: JNI_OnLoad\n");
-        sceKernelExitDeleteThread(-1);
-    }
-
-    JNI_OnLoad(&jvm);
-
-    gl_init();
-
-    // ... do some initialization
-
-    while (1) {
-        // ... render call
-        gl_swap();
-    }
-
+    sceKernelDelayThread(1000 * 1000);
     sceKernelExitDeleteThread(0);
 }
 
 void controls_handler_key(int32_t keycode, ControlsAction action) {
-    // Call into the .so here
+    (void)keycode;
+    (void)action;
 }
 
 void controls_handler_touch(int32_t id, float x, float y, ControlsAction action) {
-    // Call into the .so here
+    (void)id;
+    (void)x;
+    (void)y;
+    (void)action;
 }
 
 void controls_handler_analog(ControlsStickId which, float x, float y, ControlsAction action) {
-    // Call into the .so here
+    (void)which;
+    (void)x;
+    (void)y;
+    (void)action;
 }
