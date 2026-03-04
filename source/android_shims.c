@@ -139,10 +139,6 @@ void SDL_SetMainReady_REAL(void) {
 #endif
 }
 
-int gettid(void) {
-    return (int)sceKernelGetThreadId();
-}
-
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
@@ -216,7 +212,6 @@ static builtin_symbol g_builtin_symbols[] = {
 #endif
     { "__android_log_print", (void *)&__android_log_print },
     { "clock_gettime", (void *)&clock_gettime_soloader },
-    { "gettid", (void *)&gettid },
 };
 
 void *resolve_builtin(const char *name) {
