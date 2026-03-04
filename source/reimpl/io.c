@@ -17,6 +17,9 @@
 #include <stdarg.h>
 #include <psp2/kernel/threadmgr.h>
 
+#define TELLTALE_PKG_NAME "com.telltalegames.minecraft100"
+#define TELLTALE_OBB_DIR "/Android/obb/" TELLTALE_PKG_NAME "/"
+
 #ifdef USE_SCELIBC_IO
 #include <libc_bridge/libc_bridge.h>
 #endif
@@ -30,34 +33,74 @@
 // void stat_newlib_to_bionic(struct stat * src, stat64_bionic * dst);
 #include "reimpl/bits/_struct_converters.c"
 
+static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0) {
+        return 0;
+    }
+
+    const char *basename = NULL;
+
+    if (strcmp(src, OBB_PATH) == 0 || strstr(src, "main.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "main.obb") != NULL) {
+        basename = "main.com.telltalegames.minecraft100.obb";
+    } else if (strcmp(src, PATCH_OBB_PATH) == 0 || strstr(src, "patch.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "patch.obb") != NULL) {
+        basename = "patch.com.telltalegames.minecraft100.obb";
+    } else {
+        const char *obb_pos = strstr(src, TELLTALE_OBB_DIR);
+        if (!obb_pos)
+            return 0;
+
+        const char *candidate = obb_pos + strlen(TELLTALE_OBB_DIR);
+        if (strncmp(candidate, "main", 4) == 0) {
+            basename = "main.com.telltalegames.minecraft100.obb";
+        } else if (strncmp(candidate, "patch", 5) == 0) {
+            basename = "patch.com.telltalegames.minecraft100.obb";
+        } else {
+            return 0;
+        }
+    }
+
+    int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, basename);
+    return written > 0 && (size_t)written < dst_size;
+}
+
 FILE * fopen_soloader(const char * filename, const char * mode) {
+    const char *resolved_filename = filename;
+    char remapped_path[PATH_MAX];
+
     if (strcmp(filename, "/proc/cpuinfo") == 0) {
-        return fopen_soloader("app0:/cpuinfo", mode);
+        resolved_filename = "app0:/cpuinfo";
     } else if (strcmp(filename, "/proc/meminfo") == 0) {
-        return fopen_soloader("app0:/meminfo", mode);
+        resolved_filename = "app0:/meminfo";
+    } else if (remap_telltale_obb_path(filename, remapped_path, sizeof(remapped_path))) {
+        resolved_filename = remapped_path;
     }
 
 #ifdef USE_SCELIBC_IO
-    FILE* ret = sceLibcBridge_fopen(filename, mode);
+    FILE* ret = sceLibcBridge_fopen(resolved_filename, mode);
 #else
-    FILE* ret = fopen(filename, mode);
+    FILE* ret = fopen(resolved_filename, mode);
 #endif
 
     if (ret)
-        l_debug("fopen(%s, %s): %p", filename, mode, ret);
+        l_debug("fopen(%s => %s, %s): %p", filename, resolved_filename, mode, ret);
     else
-        l_warn("fopen(%s, %s): %p", filename, mode, ret);
+        l_warn("fopen(%s => %s, %s): %p", filename, resolved_filename, mode, ret);
 
     return ret;
 }
 
 int open_soloader(const char * path, int oflag, ...) {
+    const char *resolved_path = path;
+    char remapped_path[PATH_MAX];
+
     if (strcmp(path, "/proc/cpuinfo") == 0) {
-        return open_soloader("app0:/cpuinfo", oflag);
+        resolved_path = "app0:/cpuinfo";
     } else if (strcmp(path, "/proc/meminfo") == 0) {
-        return open_soloader("app0:/meminfo", oflag);
+        resolved_path = "app0:/meminfo";
     } else if (strcmp(path, "/dev/urandom") == 0) {
-        return open_soloader("app0:/urandom", oflag);
+        resolved_path = "app0:/urandom";
+    } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
     }
 
     mode_t mode = 0666;
@@ -70,11 +113,11 @@ int open_soloader(const char * path, int oflag, ...) {
     }
 
     oflag = oflags_bionic_to_newlib(oflag);
-    int ret = open(path, oflag, mode);
+    int ret = open(resolved_path, oflag, mode);
     if (ret >= 0)
-        l_debug("open(%s, %x): %i", path, oflag, ret);
+        l_debug("open(%s => %s, %x): %i", path, resolved_path, oflag, ret);
     else
-        l_warn("open(%s, %x): %i", path, oflag, ret);
+        l_warn("open(%s => %s, %x): %i", path, resolved_path, oflag, ret);
     return ret;
 }
 
@@ -90,18 +133,25 @@ int fstat_soloader(int fd, stat64_bionic * buf) {
 }
 
 int stat_soloader(const char * path, stat64_bionic * buf) {
+    const char *resolved_path = path;
+    char remapped_path[PATH_MAX];
+
     if (strcmp(path, "/system/lib/libOpenSLES.so") == 0) {
         l_debug("stat(%s): returning 0 in case this is a check for OpenSLES support", path);
         return 0;
     }
 
+    if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
+    }
+
     struct stat st;
-    int res = stat(path, &st);
+    int res = stat(resolved_path, &st);
 
     if (res == 0)
         stat_newlib_to_bionic(&st, buf);
 
-    l_debug("stat(%s): %i", path, res);
+    l_debug("stat(%s => %s): %i", path, resolved_path, res);
     return res;
 }
 
