@@ -1,6 +1,7 @@
 #include "utils/init.h"
 #include "utils/glutil.h"
 
+#include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
 
 #include <falso_jni/FalsoJNI.h>
@@ -19,7 +20,12 @@ so_module so_mod;
 int main() {
     soloader_init_all();
 
-    int (* JNI_OnLoad)(void *jvm) = (void *)so_symbol(&so_mod, "JNI_OnLoad");
+    int (*JNI_OnLoad)(void *jvm) = (void *)so_symbol(&so_mod, "JNI_OnLoad");
+    if (!JNI_OnLoad) {
+        sceClibPrintf("[SOLOADER] so_symbol FAILED for: JNI_OnLoad\n");
+        sceKernelExitDeleteThread(-1);
+    }
+
     JNI_OnLoad(&jvm);
 
     gl_init();
