@@ -75,6 +75,10 @@ DIR *opendir_soloader(char *name);
 
 int stat_soloader(const char * path, stat64_bionic * buf);
 
+int access_soloader(const char * path, int mode);
+
+int lstat_soloader(const char * path, stat64_bionic * buf);
+
 int fstat_soloader(int fd, stat64_bionic * buf);
 
 struct dirent64_bionic * readdir_soloader(DIR *dir);

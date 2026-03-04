@@ -380,15 +380,20 @@ so_default_dynlib default_dynlib[] = {
         { "fclose", (uintptr_t)&fclose_soloader },
         { "fcntl", (uintptr_t)&fcntl_soloader },
         { "fopen", (uintptr_t)&fopen_soloader },
+        { "fopen64", (uintptr_t)&fopen_soloader },
         { "fstat", (uintptr_t)&fstat_soloader },
         { "fsync", (uintptr_t)&fsync_soloader },
         { "ioctl", (uintptr_t)&ioctl_soloader },
         { "__open_2", (uintptr_t)&open_soloader },
+        { "__open64_2", (uintptr_t)&open_soloader },
+        { "open64", (uintptr_t)&open_soloader },
         { "open", (uintptr_t)&open_soloader },
         { "opendir", (uintptr_t)&opendir_soloader },
         { "readdir", (uintptr_t)&readdir_soloader },
         { "readdir_r", (uintptr_t)&readdir_r_soloader },
         { "stat", (uintptr_t)&stat_soloader },
+        { "stat64", (uintptr_t)&stat_soloader },
+        { "lstat64", (uintptr_t)&lstat_soloader },
         { "utime", (uintptr_t)&utime },
 
         #ifdef USE_SCELIBC_IO
@@ -447,7 +452,7 @@ so_default_dynlib default_dynlib[] = {
             { "ungetwc", (uintptr_t)&ungetwc },
         #endif
 
-        { "access", (uintptr_t)&access },
+        { "access", (uintptr_t)&access_soloader },
         { "basename", (uintptr_t)&basename },
         { "chdir", (uintptr_t)&chdir },
         { "chmod", (uintptr_t)&chmod },
@@ -458,7 +463,7 @@ so_default_dynlib default_dynlib[] = {
         { "getcwd", (uintptr_t)&getcwd },
         { "lseek", (uintptr_t)&lseek },
         { "lseek64", (uintptr_t)&ret0 }, // TODO: implement or stub with warning
-        { "lstat", (uintptr_t)&lstat },
+        { "lstat", (uintptr_t)&lstat_soloader },
         { "mkdir", (uintptr_t)&mkdir },
         { "pipe", (uintptr_t)&pipe },
         { "read", (uintptr_t)&read },
