@@ -62,7 +62,18 @@
 #include "reimpl/asset_manager.h"
 #include "android_shims.h"
 
+
 const unsigned int __page_size = PAGE_SIZE;
+
+static char *mktemp_soloader(char *tmpl) {
+    int fd = mkstemp(tmpl);
+    if (fd < 0)
+        return NULL;
+
+    close(fd);
+    unlink(tmpl);
+    return tmpl;
+}
 
 extern void * _ZNSt9exceptionD2Ev;
 extern void * _ZSt17__throw_bad_allocv;
@@ -1022,7 +1033,7 @@ so_default_dynlib default_dynlib[] = {
 
         // Temp
         { "mkstemp", (uintptr_t)&mkstemp },
-        { "mktemp", (uintptr_t)&mktemp },
+        { "mktemp", (uintptr_t)&mktemp_soloader },
         { "tmpfile", (uintptr_t)&tmpfile },
         { "tmpnam", (uintptr_t)&tmpnam },
 
