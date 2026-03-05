@@ -181,6 +181,21 @@ int gettid(void) {
     return (int)sceKernelGetThreadId();
 }
 
+
+void *glMapBufferOES_soloader(GLenum target, GLenum access) {
+    void *ptr = glMapBuffer(target, access);
+    if (!ptr) {
+        GLenum err = glGetError();
+        l_warn("[gl] glMapBufferOES(target=0x%X, access=0x%X) returned NULL (glGetError=0x%X)",
+               target, access, err);
+    }
+    return ptr;
+}
+
+GLboolean glUnmapBufferOES_soloader(GLenum target) {
+    return glUnmapBuffer(target);
+}
+
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
@@ -244,6 +259,8 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_AndroidGetExternalStorageState", (void *)&SDL_AndroidGetExternalStorageState },
     { "SDL_Android_Init", (void *)&SDL_Android_Init },
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
+    { "glMapBufferOES", (void *)&glMapBufferOES_soloader },
+    { "glUnmapBufferOES", (void *)&glUnmapBufferOES_soloader },
     { "eglGetProcAddress", (void *)&eglGetProcAddress },
     { "eglGetCurrentDisplay", (void *)&eglGetCurrentDisplay },
     { "eglGetConfigs", (void *)&eglGetConfigs },
