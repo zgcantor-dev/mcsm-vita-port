@@ -68,6 +68,7 @@ EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig * configs,
 EGLDisplay eglGetCurrentDisplay(void);
 void egl_shim_set_current_display(EGLDisplay dpy);
 EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id);
+void *eglGetProcAddress(const char *procname);
 
 char const * eglQueryString(EGLDisplay display, EGLint name);
 

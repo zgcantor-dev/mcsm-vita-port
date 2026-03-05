@@ -36,8 +36,17 @@ void gl_preload() {
 #endif
 }
 
+static int g_gl_initialized = 0;
+
 void gl_init() {
+    l_info("[gl] gl_init: calling vglInitExtended");
     vglInitExtended(0, 960, 544, 6 * 1024 * 1024, SCE_GXM_MULTISAMPLE_4X);
+    g_gl_initialized = 1;
+    l_info("[gl] gl_init: vglInitExtended completed");
+}
+
+int gl_is_initialized(void) {
+    return g_gl_initialized;
 }
 
 void gl_swap() {

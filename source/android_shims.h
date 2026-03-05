@@ -31,6 +31,14 @@ int SDL_Android_Init(void);
 void SDL_SetMainReady_REAL(void);
 int gettid(void);
 
+#ifdef USE_SDL2
+#include <SDL2/SDL.h>
+SDL_Window *SDL_CreateWindow_logged(const char *title, int x, int y,
+                                    int w, int h, Uint32 flags);
+SDL_GLContext SDL_GL_CreateContext_logged(SDL_Window *window);
+int SDL_GL_MakeCurrent_logged(SDL_Window *window, SDL_GLContext context);
+#endif
+
 EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id);
 EGLDisplay eglGetCurrentDisplay(void);
 EGLBoolean eglGetConfigs(EGLDisplay display, EGLConfig *configs, EGLint config_size, EGLint *num_config);

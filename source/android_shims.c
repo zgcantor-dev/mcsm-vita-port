@@ -8,9 +8,47 @@
 
 #include "reimpl/sys.h"
 #include "reimpl/egl.h"
+#include "utils/dialog.h"
+#include "utils/logger.h"
 
 #ifdef USE_SDL2
 #include <SDL2/SDL.h>
+#endif
+
+#ifdef USE_SDL2
+SDL_Window *SDL_CreateWindow_logged(const char *title, int x, int y,
+                                           int w, int h, Uint32 flags) {
+    SDL_Window *window = SDL_CreateWindow(title, x, y, w, h, flags);
+    const char *err = SDL_GetError();
+    l_info("[gl] SDL_CreateWindow -> %p", window);
+    if (!window) {
+        l_error("[gl] SDL_CreateWindow failed: %s", err ? err : "<no error>");
+        fatal_error("SDL_CreateWindow failed: %s", err ? err : "<no error>");
+    }
+    return window;
+}
+
+SDL_GLContext SDL_GL_CreateContext_logged(SDL_Window *window) {
+    SDL_GLContext ctx = SDL_GL_CreateContext(window);
+    const char *err = SDL_GetError();
+    l_info("[gl] SDL_GL_CreateContext(window=%p) -> %p", window, ctx);
+    if (!ctx) {
+        l_error("[gl] SDL_GL_CreateContext failed: %s", err ? err : "<no error>");
+        fatal_error("SDL_GL_CreateContext failed: %s", err ? err : "<no error>");
+    }
+    return ctx;
+}
+
+int SDL_GL_MakeCurrent_logged(SDL_Window *window, SDL_GLContext context) {
+    int ret = SDL_GL_MakeCurrent(window, context);
+    const char *err = SDL_GetError();
+    l_info("[gl] SDL_GL_MakeCurrent(window=%p, context=%p) -> %d", window, context, ret);
+    if (ret != 0) {
+        l_error("[gl] SDL_GL_MakeCurrent failed: %s", err ? err : "<no error>");
+        fatal_error("SDL_GL_MakeCurrent failed: %s", err ? err : "<no error>");
+    }
+    return ret;
+}
 #endif
 
 static const char *g_data_root = "ux0:data/com.telltalegames.minecraft100";
@@ -147,13 +185,13 @@ extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
 #ifdef USE_SDL2
-    { "SDL_CreateWindow", (void *)&SDL_CreateWindow },
+    { "SDL_CreateWindow", (void *)&SDL_CreateWindow_logged },
     { "SDL_Delay", (void *)&SDL_Delay },
     { "SDL_DestroyWindow", (void *)&SDL_DestroyWindow },
-    { "SDL_GL_CreateContext", (void *)&SDL_GL_CreateContext },
+    { "SDL_GL_CreateContext", (void *)&SDL_GL_CreateContext_logged },
     { "SDL_GL_DeleteContext", (void *)&SDL_GL_DeleteContext },
     { "SDL_GL_ExtensionSupported", (void *)&SDL_GL_ExtensionSupported },
-    { "SDL_GL_MakeCurrent", (void *)&SDL_GL_MakeCurrent },
+    { "SDL_GL_MakeCurrent", (void *)&SDL_GL_MakeCurrent_logged },
     { "SDL_GL_SetAttribute", (void *)&SDL_GL_SetAttribute },
     { "SDL_GL_SwapWindow", (void *)&SDL_GL_SwapWindow },
     { "SDL_GameControllerAddMapping", (void *)&SDL_GameControllerAddMapping },
