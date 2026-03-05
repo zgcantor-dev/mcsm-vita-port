@@ -22,6 +22,7 @@ extern "C" {
 #endif
 
 void gl_init();
+int gl_is_initialized(void);
 
 void gl_preload();
 

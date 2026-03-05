@@ -17,6 +17,13 @@
 static EGLConfig g_fake_cfg = (EGLConfig)(uintptr_t)0xC0FFEE01;
 static EGLDisplay g_current_display = (EGLDisplay)(uintptr_t)0x1;
 
+static int is_core_gl_symbol(const char *name) {
+    if (!name)
+        return 0;
+
+    return strncmp(name, "gl", 2) == 0;
+}
+
 void egl_shim_set_current_display(EGLDisplay dpy) {
     if (dpy)
         g_current_display = dpy;
@@ -32,10 +39,21 @@ EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id) {
     return dpy;
 }
 
+void *eglGetProcAddress(const char *procname) {
+    void *sym = vglGetProcAddress((const GLchar *)procname);
+    l_info("[gl] eglGetProcAddress(%s) -> %p", procname ? procname : "<null>", sym);
+    if (!sym && is_core_gl_symbol(procname))
+        l_error("[gl] eglGetProcAddress returned NULL for core symbol %s", procname);
+    return sym;
+}
+
 EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor) {
-    l_debug("eglInitialize(0x%x)", (int)dpy);
+    l_info("[gl] eglInitialize(dpy=%p)", dpy);
+    l_info("[gl] vitaGL initialized before eglInitialize: %s",
+           gl_is_initialized() ? "yes" : "no");
 
     gl_init();
+    l_info("[gl] vitaGL init completed inside eglInitialize");
 
     if (major) *major = 2;
     if (minor) *minor = 2;
