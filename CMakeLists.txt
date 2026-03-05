@@ -190,6 +190,10 @@ add_executable(${CMAKE_PROJECT_NAME}
 add_subdirectory(lib/libc_bridge)
 add_dependencies(${CMAKE_PROJECT_NAME} SceLibcBridge)
 
+# Needed for loader-side shader serialization overrides to coexist with
+# libvitaGL-provided definitions while forcing our implementation.
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
+
 target_include_directories(${CMAKE_PROJECT_NAME} SYSTEM
                            PUBLIC ${CMAKE_SOURCE_DIR}/lib
                            )
