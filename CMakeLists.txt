@@ -160,6 +160,7 @@ add_executable(${CMAKE_PROJECT_NAME}
                source/android_shims.c
                source/engine_bootstrap.c
                source/patch.c
+               source/vitagl_shader_compat.c
                source/reimpl/bits/_ctype.c
                source/reimpl/controls.c
                source/reimpl/controls.h
