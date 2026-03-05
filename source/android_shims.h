@@ -2,6 +2,7 @@
 #define ANDROID_SHIMS_H
 
 #include <stdint.h>
+#include <vitaGL.h>
 
 #include "reimpl/egl.h"
 
@@ -30,6 +31,9 @@ int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
 void SDL_SetMainReady_REAL(void);
 int gettid(void);
+
+void *glMapBufferOES_soloader(GLenum target, GLenum access);
+GLboolean glUnmapBufferOES_soloader(GLenum target);
 
 #ifdef USE_SDL2
 #include <SDL2/SDL.h>

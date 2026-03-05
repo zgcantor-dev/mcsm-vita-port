@@ -4,6 +4,7 @@
 #include <psp2/kernel/clib.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "reimpl/sys.h"
@@ -181,6 +182,118 @@ int gettid(void) {
     return (int)sceKernelGetThreadId();
 }
 
+
+typedef struct {
+    GLenum target;
+    GLuint buffer;
+    void *ptr;
+    GLsizeiptr size;
+    int active;
+} gl_map_fallback;
+
+#define GL_MAP_FALLBACK_SLOTS 4
+static gl_map_fallback g_map_fallbacks[GL_MAP_FALLBACK_SLOTS];
+
+static GLenum get_buffer_binding_enum(GLenum target) {
+    switch (target) {
+        case GL_ARRAY_BUFFER:
+            return GL_ARRAY_BUFFER_BINDING;
+        case GL_ELEMENT_ARRAY_BUFFER:
+            return GL_ELEMENT_ARRAY_BUFFER_BINDING;
+        default:
+            return 0;
+    }
+}
+
+static gl_map_fallback *find_map_fallback(GLenum target, GLuint buffer) {
+    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
+        gl_map_fallback *slot = &g_map_fallbacks[i];
+        if (slot->active && slot->target == target && slot->buffer == buffer)
+            return slot;
+    }
+
+    if (buffer != 0)
+        return NULL;
+
+    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
+        gl_map_fallback *slot = &g_map_fallbacks[i];
+        if (slot->active && slot->target == target)
+            return slot;
+    }
+
+    return NULL;
+}
+
+static gl_map_fallback *alloc_map_fallback_slot(void) {
+    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
+        if (!g_map_fallbacks[i].active)
+            return &g_map_fallbacks[i];
+    }
+
+    return NULL;
+}
+
+void *glMapBufferOES_soloader(GLenum target, GLenum access) {
+    void *ptr = glMapBuffer(target, access);
+    if (ptr)
+        return ptr;
+
+    GLenum map_err = glGetError();
+
+    GLint size = 0;
+    glGetBufferParameteriv(target, GL_BUFFER_SIZE, &size);
+    if (size <= 0) {
+        l_warn("[gl] glMapBufferOES fallback failed: target=0x%X access=0x%X mapErr=0x%X size=%d",
+               target, access, map_err, size);
+        return NULL;
+    }
+
+    GLenum binding_enum = get_buffer_binding_enum(target);
+    GLint bound_buffer = 0;
+    if (binding_enum != 0)
+        glGetIntegerv(binding_enum, &bound_buffer);
+
+    void *cpu_buffer = malloc((size_t)size);
+    if (!cpu_buffer) {
+        l_warn("[gl] glMapBufferOES fallback malloc failed: target=0x%X size=%d", target, size);
+        return NULL;
+    }
+
+    gl_map_fallback *slot = alloc_map_fallback_slot();
+    if (!slot) {
+        l_warn("[gl] glMapBufferOES fallback pool exhausted for target=0x%X", target);
+        free(cpu_buffer);
+        return NULL;
+    }
+
+    slot->target = target;
+    slot->buffer = (GLuint)bound_buffer;
+    slot->ptr = cpu_buffer;
+    slot->size = size;
+    slot->active = 1;
+
+    l_warn("[gl] glMapBufferOES returned NULL; using CPU fallback (target=0x%X buffer=%d size=%d mapErr=0x%X)",
+           target, bound_buffer, size, map_err);
+
+    return cpu_buffer;
+}
+
+GLboolean glUnmapBufferOES_soloader(GLenum target) {
+    GLenum binding_enum = get_buffer_binding_enum(target);
+    GLint bound_buffer = 0;
+    if (binding_enum != 0)
+        glGetIntegerv(binding_enum, &bound_buffer);
+
+    gl_map_fallback *slot = find_map_fallback(target, (GLuint)bound_buffer);
+    if (!slot)
+        return glUnmapBuffer(target);
+
+    glBufferSubData(target, 0, slot->size, slot->ptr);
+    free(slot->ptr);
+    memset(slot, 0, sizeof(*slot));
+    return GL_TRUE;
+}
+
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
@@ -244,6 +357,8 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_AndroidGetExternalStorageState", (void *)&SDL_AndroidGetExternalStorageState },
     { "SDL_Android_Init", (void *)&SDL_Android_Init },
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
+    { "glMapBufferOES", (void *)&glMapBufferOES_soloader },
+    { "glUnmapBufferOES", (void *)&glUnmapBufferOES_soloader },
     { "eglGetProcAddress", (void *)&eglGetProcAddress },
     { "eglGetCurrentDisplay", (void *)&eglGetCurrentDisplay },
     { "eglGetConfigs", (void *)&eglGetConfigs },
