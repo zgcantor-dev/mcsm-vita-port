@@ -25,10 +25,6 @@
 
 static int g_so_trace_enabled = DEBUG_TRACE;
 
-static const char *g_trace_active_module = NULL;
-static int g_trace_active_ctor_index = -1;
-static const char *g_trace_last_resolved_symbol = NULL;
-
 #define TRACE_LOG(fmt, ...) do { if (g_so_trace_enabled) sceClibPrintf("[SO_TRACE] " fmt "\n", ##__VA_ARGS__); } while (0)
 
 #ifndef TRACE_PLT_BINDINGS
@@ -335,7 +331,6 @@ int _so_load(so_module *mod, SceUID so_blockid, void *so_data, uintptr_t load_ad
 int so_mem_load(so_module *mod, void *buffer, size_t so_size, uintptr_t load_addr) {
     SceUID so_blockid;
     void *so_data;
-    const size_t k_max_so_copy_size = 8 * 1024 * 1024;
 
     memset(mod, 0, sizeof(so_module));
 
@@ -346,30 +341,6 @@ int so_mem_load(so_module *mod, void *buffer, size_t so_size, uintptr_t load_add
         return so_blockid;
 
     sceKernelGetMemBlockBase(so_blockid, &so_data);
-
-    sceClibPrintf("[SO_TRACE] MEMCPY_PREP so_mem_load active_mod=%s target_mod=%s ctor_idx=%d last_sym=%s dst=%p src=%p len=%u\n",
-                  g_trace_active_module ? g_trace_active_module : "<none>", so_mod_name(mod), g_trace_active_ctor_index,
-                  g_trace_last_resolved_symbol ? g_trace_last_resolved_symbol : "<none>",
-                  so_data, buffer, (unsigned int)so_size);
-
-    if (!buffer) {
-        sceClibPrintf("[SO_TRACE] MEMCPY_ABORT so_mem_load src is NULL active_mod=%s target_mod=%s ctor_idx=%d last_sym=%s len=%u\n",
-                      g_trace_active_module ? g_trace_active_module : "<none>", so_mod_name(mod), g_trace_active_ctor_index,
-                      g_trace_last_resolved_symbol ? g_trace_last_resolved_symbol : "<none>",
-                      (unsigned int)so_size);
-        sceKernelFreeMemBlock(so_blockid);
-        return -1;
-    }
-
-    if (so_size > k_max_so_copy_size) {
-        sceClibPrintf("[SO_TRACE] MEMCPY_ABORT so_mem_load len too large active_mod=%s target_mod=%s ctor_idx=%d last_sym=%s len=%u max=%u\n",
-                      g_trace_active_module ? g_trace_active_module : "<none>", so_mod_name(mod), g_trace_active_ctor_index,
-                      g_trace_last_resolved_symbol ? g_trace_last_resolved_symbol : "<none>",
-                      (unsigned int)so_size, (unsigned int)k_max_so_copy_size);
-        sceKernelFreeMemBlock(so_blockid);
-        return -2;
-    }
-
     sceClibMemcpy(so_data, buffer, so_size);
 
     int rc = _so_load(mod, so_blockid, so_data, load_addr);
@@ -615,7 +586,6 @@ int so_resolve(so_module *mod, so_default_dynlib *default_dynlib, int size_defau
                     if (!default_dynlib_only) {
                         uintptr_t link = so_resolve_link(mod, mod->dynstr + sym->st_name);
                         if (link) {
-                            g_trace_last_resolved_symbol = mod->dynstr + sym->st_name;
                             TRACE_LOG("RESOLVED %s symbol=%s addr=0x%08X", so_mod_name(mod), mod->dynstr + sym->st_name, (unsigned int)link);
                             if (type == R_ARM_ABS32) {
                                 val = *ptr + link;
@@ -697,9 +667,6 @@ int so_resolve_with_dummy(so_module *mod, so_default_dynlib *default_dynlib, int
 }
 
 void so_initialize(so_module *mod) {
-    g_trace_active_module = so_mod_name(mod);
-    g_trace_active_ctor_index = -1;
-
     if (mod->init_func) {
         TRACE_LOG("INIT_CALL %s .init fn=%p off=0x%08X", so_mod_name(mod), mod->init_func,
                   (unsigned int)((uintptr_t)mod->init_func - mod->text_base));
@@ -711,14 +678,11 @@ void so_initialize(so_module *mod) {
     for (int i = 0; i < mod->num_init_array; i++) {
         if (mod->init_array[i] && (int)mod->init_array[i] != -1) {
             uintptr_t fn = (uintptr_t)mod->init_array[i];
-            g_trace_active_ctor_index = i;
             TRACE_LOG("INIT_ENTER %s i=%d/%d fn=%p off=0x%08X", so_mod_name(mod), i, mod->num_init_array, mod->init_array[i], (unsigned int)(fn - mod->text_base));
             mod->init_array[i]();
             TRACE_LOG("INIT_LEAVE %s i=%d/%d fn=%p off=0x%08X", so_mod_name(mod), i, mod->num_init_array, mod->init_array[i], (unsigned int)(fn - mod->text_base));
         }
     }
-
-    g_trace_active_ctor_index = -1;
 }
 
 uint32_t so_hash(const uint8_t *name) {

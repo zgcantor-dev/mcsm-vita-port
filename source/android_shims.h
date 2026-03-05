@@ -29,6 +29,7 @@ const char *SDL_AndroidGetInternalStoragePath(void);
 int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
 void SDL_SetMainReady_REAL(void);
+int gettid(void);
 
 EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id);
 EGLDisplay eglGetCurrentDisplay(void);

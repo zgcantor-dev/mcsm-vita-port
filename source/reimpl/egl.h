@@ -17,6 +17,14 @@
 
 #include <vitaGL.h>
 
+#ifndef EGLNativeDisplayType
+typedef void* EGLNativeDisplayType;
+#endif
+
+#ifndef EGLNativeWindowType
+typedef void* EGLNativeWindowType;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

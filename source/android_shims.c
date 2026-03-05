@@ -13,7 +13,7 @@
 #include <SDL2/SDL.h>
 #endif
 
-static const char *g_data_root = "ux0:data/mcsm";
+static const char *g_data_root = "ux0:data/com.telltalegames.minecraft100";
 
 void android_shims_init(const char *data_root) {
     if (data_root && data_root[0] != '\0')
@@ -139,6 +139,10 @@ void SDL_SetMainReady_REAL(void) {
 #endif
 }
 
+int gettid(void) {
+    return (int)sceKernelGetThreadId();
+}
+
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 
 static builtin_symbol g_builtin_symbols[] = {
@@ -212,6 +216,7 @@ static builtin_symbol g_builtin_symbols[] = {
 #endif
     { "__android_log_print", (void *)&__android_log_print },
     { "clock_gettime", (void *)&clock_gettime_soloader },
+    { "gettid", (void *)&gettid },
 };
 
 void *resolve_builtin(const char *name) {

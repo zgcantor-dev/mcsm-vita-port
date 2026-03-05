@@ -123,7 +123,7 @@ else()
 endif()
 
 set(valid_dump_formats GLSL CG)
-option(DUMP_COMPILED_SHADERS "When using GLSL or CG shader format, cache compiled shaders on disk" ON)
+option(DUMP_COMPILED_SHADERS "When using GLSL or CG shader format, cache compiled shaders on disk" OFF)
 if (DUMP_COMPILED_SHADERS)
   if (SHADER_FORMAT IN_LIST valid_dump_formats)
     add_definitions(-DDUMP_COMPILED_SHADERS)
@@ -249,6 +249,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
                       SceAudioIn_stub
                       SceCommonDialog_stub
                       SceDisplay_stub
+                      SceIme_stub
                       SceKernelDmacMgr_stub
                       SceFios2_stub
                       SceCtrl_stub
