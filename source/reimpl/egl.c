@@ -39,12 +39,12 @@ EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id) {
     return dpy;
 }
 
-void *eglGetProcAddress(const char *procname) {
+void (*eglGetProcAddress(const char *procname))(void) {
     void *sym = vglGetProcAddress((const GLchar *)procname);
     l_info("[gl] eglGetProcAddress(%s) -> %p", procname ? procname : "<null>", sym);
     if (!sym && is_core_gl_symbol(procname))
         l_error("[gl] eglGetProcAddress returned NULL for core symbol %s", procname);
-    return sym;
+    return (void (*)(void))sym;
 }
 
 EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor) {
