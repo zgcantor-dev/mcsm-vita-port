@@ -160,6 +160,7 @@ add_executable(${CMAKE_PROJECT_NAME}
                source/android_shims.c
                source/engine_bootstrap.c
                source/patch.c
+               source/vitagl_shader_compat.c
                source/reimpl/bits/_ctype.c
                source/reimpl/controls.c
                source/reimpl/controls.h
@@ -188,6 +189,10 @@ add_executable(${CMAKE_PROJECT_NAME}
 
 add_subdirectory(lib/libc_bridge)
 add_dependencies(${CMAKE_PROJECT_NAME} SceLibcBridge)
+
+# Needed for loader-side shader serialization overrides to coexist with
+# libvitaGL-provided definitions while forcing our implementation.
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 
 target_include_directories(${CMAKE_PROJECT_NAME} SYSTEM
                            PUBLIC ${CMAKE_SOURCE_DIR}/lib
