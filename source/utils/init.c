@@ -117,6 +117,8 @@ void soloader_init_all() {
 #endif
 
     android_shims_init(DATA_PATH);
+    jni_init();
+    l_info("Vita JNI shim initialized before SO constructors");
 
     uintptr_t load_address = LOAD_ADDRESS;
 
@@ -157,7 +159,6 @@ void soloader_init_all() {
     l_success("Engine libraries loaded + initialized.");
 
     gl_preload();
-    jni_init();
     controls_init();
 
 #ifdef LOAD_GAMEENGINE_SO

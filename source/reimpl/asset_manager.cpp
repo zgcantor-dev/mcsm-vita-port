@@ -37,6 +37,22 @@ AAssetManager * AAssetManager_create() {
     return g_AAssetManager;
 }
 
+
+AAssetManager *AAssetManager_fromJava(void *env, void *assetManager) {
+    if (!env) {
+        l_error("AAssetManager_fromJava called with NULL JNIEnv; using Vita filesystem asset manager fallback");
+    }
+
+    if (!assetManager) {
+        l_warn("AAssetManager_fromJava called with NULL Java AssetManager object; using fallback");
+    }
+
+    AAssetManager *mgr = AAssetManager_create();
+    l_info("AAssetManager_fromJava(env=%p, assetManager=%p) -> %p (Vita filesystem backend at %s/assets/)",
+           env, assetManager, mgr, DATA_PATH);
+    return mgr;
+}
+
 AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
     std::string realp = std::string(DATA_PATH) + std::string("assets/") + std::string(filename);
 
