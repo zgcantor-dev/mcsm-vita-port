@@ -17,6 +17,13 @@
 static EGLConfig g_fake_cfg = (EGLConfig)(uintptr_t)0xC0FFEE01;
 static EGLDisplay g_current_display = (EGLDisplay)(uintptr_t)0x1;
 
+static GLboolean glIsVertexArrayOES_soloader(GLuint array) {
+    // GLES2/OES VAO support is optional on VitaGL in this loader path.
+    // Return false instead of leaving unresolved symbols that break init.
+    (void)array;
+    return GL_FALSE;
+}
+
 static int is_core_gl_symbol(const char *name) {
     if (!name)
         return 0;
@@ -40,6 +47,11 @@ EGLDisplay egl_shim_get_display(EGLNativeDisplayType display_id) {
 }
 
 void (*eglGetProcAddress(const char *procname))(void) {
+    if (procname && strcmp(procname, "glIsVertexArrayOES") == 0) {
+        l_warn("[gl] eglGetProcAddress(glIsVertexArrayOES) -> stub");
+        return (void (*)(void))&glIsVertexArrayOES_soloader;
+    }
+
     void *sym = vglGetProcAddress((const GLchar *)procname);
     l_info("[gl] eglGetProcAddress(%s) -> %p", procname ? procname : "<null>", sym);
     if (!sym && is_core_gl_symbol(procname))
