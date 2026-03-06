@@ -696,7 +696,7 @@ so_default_dynlib default_dynlib[] = {
         { "glGetLightxv", (uintptr_t)&ret0 },
         { "glGetMaterialfv", (uintptr_t)&ret0 },
         { "glGetMaterialxv", (uintptr_t)&ret0 },
-        { "glGetPointerv", (uintptr_t)&ret0 },
+        { "glGetPointerv", (uintptr_t)&glGetPointerv },
         { "glGetRenderbufferParameterivOES", (uintptr_t)&ret0 },
         { "glGetProgramInfoLog", (uintptr_t)&glGetProgramInfoLog },
         { "glGetProgramiv", (uintptr_t)&glGetProgramiv },
@@ -1124,6 +1124,12 @@ void *dlsym_soloader(void * handle, const char * symbol) {
     void *builtin = resolve_builtin(symbol);
     if (builtin)
         return builtin;
+
+    if (symbol && symbol[0] == 'g' && symbol[1] == 'l') {
+        void *gl_sym = eglGetProcAddress(symbol);
+        if (gl_sym)
+            return gl_sym;
+    }
 
     uintptr_t link = so_symbol_global(NULL, symbol, 1);
     if (link)
