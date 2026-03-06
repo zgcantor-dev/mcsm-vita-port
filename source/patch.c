@@ -21,18 +21,28 @@
 extern so_module so_mod;
 
 static so_hook begin_static_vertices_hook;
-static uint8_t emergency_static_vertices[0x4000] __attribute__((aligned(16)));
+static uint8_t emergency_static_vertices[0x80000] __attribute__((aligned(16)));
 
 static void *begin_static_vertices_patched(void *vertex_buffer, int format, int count) {
     void *result = SO_CONTINUE(void *, begin_static_vertices_hook, vertex_buffer, format, count);
 
-    // libGameEngine's RenderUtility::Initialize() writes ~0x4000 bytes immediately
-    // after BeginStaticVertices(format=2, count=0xFFFF) without a null-check.
-    // Provide a small fallback buffer to avoid a hard crash when the native call fails.
-    if (!result && format == 2 && count == 0xFFFF) {
-        sceClibMemset(emergency_static_vertices, 0, sizeof(emergency_static_vertices));
-        l_warn("BeginStaticVertices returned NULL for format=%d count=%d; using emergency scratch buffer.", format, count);
-        return emergency_static_vertices;
+    // libGameEngine writes into this buffer without null-checking. In practice
+    // RenderUtility::Initialize() can request very large ranges (e.g. count=0x3FFE),
+    // so fallback storage needs to be large enough for those writes.
+    if (!result) {
+        // The observed initialization paths write 16 bytes per vertex and may
+        // touch one extra record. Keep the estimate conservative.
+        size_t required = (count >= 0 && count < 0x100000) ? ((size_t)count + 1) * 16 : 0;
+
+        if (required <= sizeof(emergency_static_vertices)) {
+            sceClibMemset(emergency_static_vertices, 0, sizeof(emergency_static_vertices));
+            l_warn("BeginStaticVertices returned NULL for format=%d count=%d; using %u-byte emergency scratch buffer.",
+                   format, count, (unsigned)sizeof(emergency_static_vertices));
+            return emergency_static_vertices;
+        }
+
+        l_error("BeginStaticVertices returned NULL for format=%d count=%d; estimated %u bytes exceeds emergency buffer.",
+                format, count, (unsigned)required);
     }
 
     return result;
