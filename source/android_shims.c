@@ -154,7 +154,7 @@ const char *SDL_GetHint(const char *name) {
 #endif
 
 void *SDL_AndroidGetJNIEnv(void) {
-    if (!jni.functions) {
+    if (!jni) {
         l_error("SDL_AndroidGetJNIEnv requested before JNI shim initialization");
         return NULL;
     }
