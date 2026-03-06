@@ -14,15 +14,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+extern GLboolean glIsVertexArrayOES_soloader(GLuint array);
+
 static EGLConfig g_fake_cfg = (EGLConfig)(uintptr_t)0xC0FFEE01;
 static EGLDisplay g_current_display = (EGLDisplay)(uintptr_t)0x1;
-
-static GLboolean glIsVertexArrayOES_soloader(GLuint array) {
-    // GLES2/OES VAO support is optional on VitaGL in this loader path.
-    // Return false instead of leaving unresolved symbols that break init.
-    (void)array;
-    return GL_FALSE;
-}
 
 static int is_core_gl_symbol(const char *name) {
     if (!name)
