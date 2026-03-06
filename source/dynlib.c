@@ -318,7 +318,7 @@ so_default_dynlib default_dynlib[] = {
         { "AAsset_openFileDescriptor", (uintptr_t)&AAsset_openFileDescriptor },
         { "AAssetDir_close", (uintptr_t)&AAssetDir_close },
         { "AAssetDir_getNextFileName", (uintptr_t)&AAssetDir_getNextFileName },
-        { "AAssetManager_fromJava", (uintptr_t)&ret1 },
+        { "AAssetManager_fromJava", (uintptr_t)&AAssetManager_fromJava },
         { "AAssetManager_open", (uintptr_t)&AAssetManager_open },
         { "AAssetManager_openDir", (uintptr_t)&AAssetManager_openDir },
 

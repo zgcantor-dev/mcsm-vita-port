@@ -62,6 +62,12 @@ enum {
 AAssetManager * AAssetManager_create();
 
 /**
+ * Vita shim: convert Java AssetManager object to native manager.
+ * On Vita this ignores Java state and returns the filesystem-backed singleton.
+ */
+AAssetManager *AAssetManager_fromJava(void *env, void *assetManager);
+
+/**
  * Open the named directory within the asset hierarchy.  The directory can then
  * be inspected with the AAssetDir functions.  To open the top-level directory,
  * pass in "" as the dirName.

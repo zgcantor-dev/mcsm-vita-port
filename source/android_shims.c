@@ -11,6 +11,7 @@
 #include "reimpl/egl.h"
 #include "utils/dialog.h"
 #include "utils/logger.h"
+#include <falso_jni/FalsoJNI.h>
 
 #ifdef USE_SDL2
 #include <SDL2/SDL.h>
@@ -153,7 +154,13 @@ const char *SDL_GetHint(const char *name) {
 #endif
 
 void *SDL_AndroidGetJNIEnv(void) {
-    return NULL;
+    if (!jni.functions) {
+        l_error("SDL_AndroidGetJNIEnv requested before JNI shim initialization");
+        return NULL;
+    }
+
+    l_info("SDL_AndroidGetJNIEnv returning Vita JNI shim env=%p", (void *)&jni);
+    return &jni;
 }
 
 const char *SDL_AndroidGetInternalStoragePath(void) {
