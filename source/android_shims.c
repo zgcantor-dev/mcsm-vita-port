@@ -188,10 +188,24 @@ typedef struct gl_map_fallback {
     GLuint buffer;
     void *ptr;
     GLsizeiptr size;
+    int shadow_mapped;
     struct gl_map_fallback *next;
 } gl_map_fallback;
 
 static gl_map_fallback *g_map_fallbacks;
+static GLuint g_bound_array_buffer;
+static GLuint g_bound_element_array_buffer;
+
+static GLuint *get_bound_buffer_slot(GLenum target) {
+    switch (target) {
+        case GL_ARRAY_BUFFER:
+            return &g_bound_array_buffer;
+        case GL_ELEMENT_ARRAY_BUFFER:
+            return &g_bound_element_array_buffer;
+        default:
+            return NULL;
+    }
+}
 
 static GLenum get_buffer_binding_enum(GLenum target) {
     switch (target) {
@@ -232,76 +246,151 @@ static gl_map_fallback *alloc_map_fallback_slot(void) {
     return slot;
 }
 
-static void free_map_fallback_slot(gl_map_fallback *slot) {
-    gl_map_fallback **cursor = &g_map_fallbacks;
-    while (*cursor != NULL) {
-        if (*cursor == slot) {
-            *cursor = slot->next;
-            free(slot);
-            return;
-        }
-        cursor = &((*cursor)->next);
+void glBindBuffer_soloader(GLenum target, GLuint buffer) {
+    GLuint *bound_slot = get_bound_buffer_slot(target);
+    if (bound_slot)
+        *bound_slot = buffer;
+
+    glBindBuffer(target, buffer);
+}
+
+void glBufferData_soloader(GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage) {
+    glBufferData(target, size, data, usage);
+
+    GLuint *bound_slot = get_bound_buffer_slot(target);
+    if (!bound_slot || *bound_slot == 0)
+        return;
+
+    gl_map_fallback *slot = find_map_fallback(target, *bound_slot);
+    if (!slot)
+        return;
+
+    slot->size = size;
+    if (slot->ptr && slot->size > 0) {
+        void *resized = realloc(slot->ptr, (size_t)slot->size);
+        if (resized)
+            slot->ptr = resized;
     }
+}
+
+void glDeleteBuffers_soloader(GLsizei n, const GLuint *buffers) {
+    if (buffers) {
+        for (GLsizei i = 0; i < n; i++) {
+            GLuint id = buffers[i];
+            gl_map_fallback **cursor = &g_map_fallbacks;
+            while (*cursor) {
+                gl_map_fallback *slot = *cursor;
+                if (slot->buffer == id) {
+                    *cursor = slot->next;
+                    free(slot->ptr);
+                    free(slot);
+                    continue;
+                }
+                cursor = &((*cursor)->next);
+            }
+
+            if (g_bound_array_buffer == id)
+                g_bound_array_buffer = 0;
+            if (g_bound_element_array_buffer == id)
+                g_bound_element_array_buffer = 0;
+        }
+    }
+
+    glDeleteBuffers(n, buffers);
 }
 
 void *glMapBufferOES_soloader(GLenum target, GLenum access) {
+    GLuint *bound_slot = get_bound_buffer_slot(target);
+    GLuint tracked_buffer = bound_slot ? *bound_slot : 0;
+
+    if (tracked_buffer == 0) {
+        GLenum binding_enum = get_buffer_binding_enum(target);
+        if (binding_enum != 0) {
+            GLint queried_buffer = 0;
+            glGetIntegerv(binding_enum, &queried_buffer);
+            tracked_buffer = (GLuint)queried_buffer;
+            if (bound_slot)
+                *bound_slot = tracked_buffer;
+        }
+    }
+
+    GLsizeiptr size = 0;
+    GLint queried_size = 0;
+    glGetBufferParameteriv(target, GL_BUFFER_SIZE, &queried_size);
+    if (queried_size > 0)
+        size = queried_size;
+
     void *ptr = glMapBuffer(target, access);
-    if (ptr)
+    if (ptr) {
+        l_info("[gl] glMapBufferOES target=0x%X size=%d nativeMap=1 shadowFallback=0",
+               target, (int)size);
         return ptr;
-
-    GLenum map_err = glGetError();
-
-    GLint size = 0;
-    glGetBufferParameteriv(target, GL_BUFFER_SIZE, &size);
-    if (size <= 0) {
-        l_warn("[gl] glMapBufferOES fallback failed: target=0x%X access=0x%X mapErr=0x%X size=%d",
-               target, access, map_err, size);
-        return NULL;
     }
 
-    GLenum binding_enum = get_buffer_binding_enum(target);
-    GLint bound_buffer = 0;
-    if (binding_enum != 0)
-        glGetIntegerv(binding_enum, &bound_buffer);
-
-    void *cpu_buffer = malloc((size_t)size);
-    if (!cpu_buffer) {
-        l_warn("[gl] glMapBufferOES fallback malloc failed: target=0x%X size=%d", target, size);
-        return NULL;
-    }
-
-    gl_map_fallback *slot = alloc_map_fallback_slot();
+    gl_map_fallback *slot = find_map_fallback(target, tracked_buffer);
     if (!slot) {
-        l_warn("[gl] glMapBufferOES fallback alloc failed for target=0x%X", target);
-        free(cpu_buffer);
+        slot = alloc_map_fallback_slot();
+        if (!slot) {
+            l_warn("[gl] glMapBufferOES fallback alloc failed for target=0x%X", target);
+            return NULL;
+        }
+        slot->target = target;
+        slot->buffer = tracked_buffer;
+    }
+
+    slot->size = size;
+    slot->shadow_mapped = 0;
+
+    if (slot->size <= 0) {
+        GLenum map_err = glGetError();
+        l_warn("[gl] glMapBufferOES target=0x%X size=%d nativeMap=0 shadowFallback=0 mapErr=0x%X",
+               target, (int)slot->size, map_err);
         return NULL;
     }
 
-    slot->target = target;
-    slot->buffer = (GLuint)bound_buffer;
-    slot->ptr = cpu_buffer;
-    slot->size = size;
+    if (!slot->ptr) {
+        slot->ptr = malloc((size_t)slot->size);
+    } else {
+        void *resized = realloc(slot->ptr, (size_t)slot->size);
+        if (resized)
+            slot->ptr = resized;
+    }
 
-    l_warn("[gl] glMapBufferOES returned NULL; using CPU fallback (target=0x%X buffer=%d size=%d mapErr=0x%X)",
-           target, bound_buffer, size, map_err);
+    if (!slot->ptr) {
+        l_warn("[gl] glMapBufferOES fallback malloc failed: target=0x%X size=%d", target, (int)slot->size);
+        return NULL;
+    }
 
-    return cpu_buffer;
+    slot->shadow_mapped = 1;
+    l_warn("[gl] glMapBufferOES target=0x%X size=%d nativeMap=0 shadowFallback=1",
+           target, (int)slot->size);
+    return slot->ptr;
 }
 
 GLboolean glUnmapBufferOES_soloader(GLenum target) {
-    GLenum binding_enum = get_buffer_binding_enum(target);
-    GLint bound_buffer = 0;
-    if (binding_enum != 0)
-        glGetIntegerv(binding_enum, &bound_buffer);
+    GLuint *bound_slot = get_bound_buffer_slot(target);
+    GLuint tracked_buffer = bound_slot ? *bound_slot : 0;
 
-    gl_map_fallback *slot = find_map_fallback(target, (GLuint)bound_buffer);
-    if (!slot)
-        return glUnmapBuffer(target);
+    if (tracked_buffer == 0) {
+        GLenum binding_enum = get_buffer_binding_enum(target);
+        if (binding_enum != 0) {
+            GLint queried_buffer = 0;
+            glGetIntegerv(binding_enum, &queried_buffer);
+            tracked_buffer = (GLuint)queried_buffer;
+            if (bound_slot)
+                *bound_slot = tracked_buffer;
+        }
+    }
 
-    glBufferSubData(target, 0, slot->size, slot->ptr);
-    free(slot->ptr);
-    free_map_fallback_slot(slot);
-    return GL_TRUE;
+    gl_map_fallback *slot = find_map_fallback(target, tracked_buffer);
+    if (slot && slot->shadow_mapped) {
+        if (slot->ptr && slot->size > 0)
+            glBufferSubData(target, 0, slot->size, slot->ptr);
+        slot->shadow_mapped = 0;
+        return GL_TRUE;
+    }
+
+    return glUnmapBuffer(target);
 }
 
 extern int __android_log_print(int prio, const char *tag, const char *fmt, ...);
