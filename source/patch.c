@@ -21,7 +21,10 @@
 extern so_module so_mod;
 
 static so_hook begin_static_vertices_hook;
-static uint8_t emergency_static_vertices[0x80000] __attribute__((aligned(16)));
+// RenderUtility::Initialize() can request count=0xFFFF and then write
+// 16-byte records, requiring up to 1 MiB. Keep a 1 MiB emergency buffer
+// for bad pointers returned by BeginStaticVertices.
+static uint8_t emergency_static_vertices[0x100000] __attribute__((aligned(16)));
 
 static void *begin_static_vertices_patched(void *vertex_buffer, int format, int count) {
     void *result = SO_CONTINUE(void *, begin_static_vertices_hook, vertex_buffer, format, count);
