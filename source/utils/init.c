@@ -72,6 +72,14 @@ static void relocate_resolve_init(so_module *mod) {
     so_initialize(mod);
 }
 
+static void relocate_resolve_patch_init(so_module *mod) {
+    so_relocate(mod);
+    resolve_imports(mod);
+    so_patch();
+    so_flush_caches(mod);
+    so_initialize(mod);
+}
+
 static void configure_system() {
     sceAppUtilInit(&(SceAppUtilInitParam){}, &(SceAppUtilBootParam){});
     SceAppUtilAppEventParam eventParam;
@@ -140,7 +148,7 @@ void soloader_init_all() {
     relocate_resolve_init(&fmodstudio_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
-    relocate_resolve_init(&gameengine_mod);
+    relocate_resolve_patch_init(&gameengine_mod);
 #endif
 #ifdef LOAD_MAIN_SO_FOR_TRACE
     relocate_resolve_init(&main_trace_mod);
