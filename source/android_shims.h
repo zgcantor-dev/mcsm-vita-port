@@ -34,6 +34,7 @@ int gettid(void);
 
 void *glMapBufferOES_soloader(GLenum target, GLenum access);
 GLboolean glUnmapBufferOES_soloader(GLenum target);
+GLboolean glIsVertexArrayOES_soloader(GLuint array);
 void glBindBuffer_soloader(GLenum target, GLuint buffer);
 void glBufferData_soloader(GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage);
 void glDeleteBuffers_soloader(GLsizei n, const GLuint *buffers);
