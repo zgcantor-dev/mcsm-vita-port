@@ -68,7 +68,7 @@ static const char *detect_telltale_obb_basename(const char *src) {
     return basename;
 }
 
-static int file_exists(const char *path) {
+static int path_exists_local(const char *path) {
     struct stat st;
     return path && stat(path, &st) == 0;
 }
@@ -81,7 +81,7 @@ static int try_build_obb_candidate(char *dst, size_t dst_size, const char *dir, 
     if (written <= 0 || (size_t)written >= dst_size)
         return 0;
 
-    return file_exists(dst);
+    return path_exists_local(dst);
 }
 
 static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, char *dst, size_t dst_size) {
