@@ -183,16 +183,15 @@ int gettid(void) {
 }
 
 
-typedef struct {
+typedef struct gl_map_fallback {
     GLenum target;
     GLuint buffer;
     void *ptr;
     GLsizeiptr size;
-    int active;
+    struct gl_map_fallback *next;
 } gl_map_fallback;
 
-#define GL_MAP_FALLBACK_SLOTS 4
-static gl_map_fallback g_map_fallbacks[GL_MAP_FALLBACK_SLOTS];
+static gl_map_fallback *g_map_fallbacks;
 
 static GLenum get_buffer_binding_enum(GLenum target) {
     switch (target) {
@@ -206,18 +205,16 @@ static GLenum get_buffer_binding_enum(GLenum target) {
 }
 
 static gl_map_fallback *find_map_fallback(GLenum target, GLuint buffer) {
-    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
-        gl_map_fallback *slot = &g_map_fallbacks[i];
-        if (slot->active && slot->target == target && slot->buffer == buffer)
+    for (gl_map_fallback *slot = g_map_fallbacks; slot != NULL; slot = slot->next) {
+        if (slot->target == target && slot->buffer == buffer)
             return slot;
     }
 
     if (buffer != 0)
         return NULL;
 
-    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
-        gl_map_fallback *slot = &g_map_fallbacks[i];
-        if (slot->active && slot->target == target)
+    for (gl_map_fallback *slot = g_map_fallbacks; slot != NULL; slot = slot->next) {
+        if (slot->target == target)
             return slot;
     }
 
@@ -225,12 +222,26 @@ static gl_map_fallback *find_map_fallback(GLenum target, GLuint buffer) {
 }
 
 static gl_map_fallback *alloc_map_fallback_slot(void) {
-    for (int i = 0; i < GL_MAP_FALLBACK_SLOTS; i++) {
-        if (!g_map_fallbacks[i].active)
-            return &g_map_fallbacks[i];
-    }
+    gl_map_fallback *slot = (gl_map_fallback *)malloc(sizeof(*slot));
+    if (!slot)
+        return NULL;
 
-    return NULL;
+    memset(slot, 0, sizeof(*slot));
+    slot->next = g_map_fallbacks;
+    g_map_fallbacks = slot;
+    return slot;
+}
+
+static void free_map_fallback_slot(gl_map_fallback *slot) {
+    gl_map_fallback **cursor = &g_map_fallbacks;
+    while (*cursor != NULL) {
+        if (*cursor == slot) {
+            *cursor = slot->next;
+            free(slot);
+            return;
+        }
+        cursor = &((*cursor)->next);
+    }
 }
 
 void *glMapBufferOES_soloader(GLenum target, GLenum access) {
@@ -261,7 +272,7 @@ void *glMapBufferOES_soloader(GLenum target, GLenum access) {
 
     gl_map_fallback *slot = alloc_map_fallback_slot();
     if (!slot) {
-        l_warn("[gl] glMapBufferOES fallback pool exhausted for target=0x%X", target);
+        l_warn("[gl] glMapBufferOES fallback alloc failed for target=0x%X", target);
         free(cpu_buffer);
         return NULL;
     }
@@ -270,7 +281,6 @@ void *glMapBufferOES_soloader(GLenum target, GLenum access) {
     slot->buffer = (GLuint)bound_buffer;
     slot->ptr = cpu_buffer;
     slot->size = size;
-    slot->active = 1;
 
     l_warn("[gl] glMapBufferOES returned NULL; using CPU fallback (target=0x%X buffer=%d size=%d mapErr=0x%X)",
            target, bound_buffer, size, map_err);
@@ -290,7 +300,7 @@ GLboolean glUnmapBufferOES_soloader(GLenum target) {
 
     glBufferSubData(target, 0, slot->size, slot->ptr);
     free(slot->ptr);
-    memset(slot, 0, sizeof(*slot));
+    free_map_fallback_slot(slot);
     return GL_TRUE;
 }
 
