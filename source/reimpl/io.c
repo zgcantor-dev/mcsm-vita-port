@@ -21,6 +21,8 @@
 #define TELLTALE_OBB_DIR "/Android/obb/" TELLTALE_PKG_NAME "/"
 #define VITA_OBB_DIR "ux0:" TELLTALE_OBB_DIR
 
+#define OBB_SCAN_MAX_DEPTH 5
+
 #ifdef USE_SCELIBC_IO
 #include <libc_bridge/libc_bridge.h>
 #endif
@@ -66,6 +68,95 @@ static const char *detect_telltale_obb_basename(const char *src) {
     return basename;
 }
 
+static int file_exists(const char *path) {
+    struct stat st;
+    return path && stat(path, &st) == 0;
+}
+
+static int try_build_obb_candidate(char *dst, size_t dst_size, const char *dir, const char *basename) {
+    if (!dst || dst_size == 0 || !dir || !basename)
+        return 0;
+
+    int written = snprintf(dst, dst_size, "%s%s", dir, basename);
+    if (written <= 0 || (size_t)written >= dst_size)
+        return 0;
+
+    return file_exists(dst);
+}
+
+static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, char *dst, size_t dst_size) {
+    if (!dir_path || !basename || !dst || dst_size == 0 || depth > OBB_SCAN_MAX_DEPTH)
+        return 0;
+
+    DIR *dir = opendir(dir_path);
+    if (!dir)
+        return 0;
+
+    int found = 0;
+    struct dirent *entry;
+    while (!found && (entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char candidate[PATH_MAX];
+        int written = snprintf(candidate, sizeof(candidate), "%s%s", dir_path, entry->d_name);
+        if (written <= 0 || (size_t)written >= sizeof(candidate))
+            continue;
+
+        struct stat st;
+        if (stat(candidate, &st) != 0)
+            continue;
+
+        if (S_ISREG(st.st_mode)) {
+            if (strcmp(entry->d_name, basename) == 0) {
+                written = snprintf(dst, dst_size, "%s", candidate);
+                found = written > 0 && (size_t)written < dst_size;
+            }
+            continue;
+        }
+
+        if (!S_ISDIR(st.st_mode) || depth >= OBB_SCAN_MAX_DEPTH)
+            continue;
+
+        size_t candidate_len = strlen(candidate);
+        if (candidate_len + 1 >= sizeof(candidate))
+            continue;
+
+        candidate[candidate_len] = '/';
+        candidate[candidate_len + 1] = '\0';
+
+        found = scan_dir_for_file(candidate, basename, depth + 1, dst, dst_size);
+    }
+
+    closedir(dir);
+    return found;
+}
+
+static int resolve_telltale_obb_path(const char *basename, char *dst, size_t dst_size) {
+    if (!basename || !dst || dst_size == 0)
+        return 0;
+
+    // Primary Android-like location.
+    if (try_build_obb_candidate(dst, dst_size, VITA_OBB_DIR, basename))
+        return 1;
+
+    // Common Vita layouts used by ports/users.
+    if (try_build_obb_candidate(dst, dst_size, DATA_PATH, basename))
+        return 1;
+
+    if (try_build_obb_candidate(dst, dst_size, DATA_PATH "obb/", basename))
+        return 1;
+
+    if (try_build_obb_candidate(dst, dst_size, DATA_PATH "Android/obb/" TELLTALE_PKG_NAME "/", basename))
+        return 1;
+
+    // Last resort: scan under data root for these known OBB names.
+    if (scan_dir_for_file(DATA_PATH, basename, 0, dst, dst_size))
+        return 1;
+
+    return 0;
+}
+
 static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) {
     if (!dst || dst_size == 0) {
         return 0;
@@ -74,6 +165,9 @@ static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) 
     const char *basename = detect_telltale_obb_basename(src);
     if (!basename)
         return 0;
+
+    if (resolve_telltale_obb_path(basename, dst, dst_size))
+        return 1;
 
     int written = snprintf(dst, dst_size, "%s%s", VITA_OBB_DIR, basename);
     return written > 0 && (size_t)written < dst_size;
