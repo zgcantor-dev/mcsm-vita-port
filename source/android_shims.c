@@ -188,6 +188,7 @@ typedef struct gl_map_fallback {
     GLuint buffer;
     void *ptr;
     GLsizeiptr size;
+    GLsizeiptr capacity;
     int shadow_mapped;
     struct gl_map_fallback *next;
 } gl_map_fallback;
@@ -246,6 +247,22 @@ static gl_map_fallback *alloc_map_fallback_slot(void) {
     return slot;
 }
 
+static int ensure_map_fallback_capacity(gl_map_fallback *slot, GLsizeiptr size) {
+    if (!slot || size <= 0)
+        return 0;
+
+    if (slot->ptr && slot->capacity >= size)
+        return 1;
+
+    void *resized = realloc(slot->ptr, (size_t)size);
+    if (!resized)
+        return 0;
+
+    slot->ptr = resized;
+    slot->capacity = size;
+    return 1;
+}
+
 void glBindBuffer_soloader(GLenum target, GLuint buffer) {
     GLuint *bound_slot = get_bound_buffer_slot(target);
     if (bound_slot)
@@ -262,15 +279,17 @@ void glBufferData_soloader(GLenum target, GLsizeiptr size, const GLvoid *data, G
         return;
 
     gl_map_fallback *slot = find_map_fallback(target, *bound_slot);
-    if (!slot)
-        return;
+    if (!slot) {
+        slot = alloc_map_fallback_slot();
+        if (!slot)
+            return;
+        slot->target = target;
+        slot->buffer = *bound_slot;
+    }
 
     slot->size = size;
-    if (slot->ptr && slot->size > 0) {
-        void *resized = realloc(slot->ptr, (size_t)slot->size);
-        if (resized)
-            slot->ptr = resized;
-    }
+    if (slot->size > 0 && !ensure_map_fallback_capacity(slot, slot->size))
+        l_warn("[gl] glBufferData_soloader could not reserve shadow map buffer: target=0x%X size=%d", target, (int)slot->size);
 }
 
 void glDeleteBuffers_soloader(GLsizei n, const GLuint *buffers) {
@@ -320,13 +339,6 @@ void *glMapBufferOES_soloader(GLenum target, GLenum access) {
     if (queried_size > 0)
         size = queried_size;
 
-    void *ptr = glMapBuffer(target, access);
-    if (ptr) {
-        l_info("[gl] glMapBufferOES target=0x%X size=%d nativeMap=1 shadowFallback=0",
-               target, (int)size);
-        return ptr;
-    }
-
     gl_map_fallback *slot = find_map_fallback(target, tracked_buffer);
     if (!slot) {
         slot = alloc_map_fallback_slot();
@@ -338,32 +350,33 @@ void *glMapBufferOES_soloader(GLenum target, GLenum access) {
         slot->buffer = tracked_buffer;
     }
 
+    if (size <= 0 && slot->size > 0)
+        size = slot->size;
+
+    void *ptr = glMapBuffer(target, access);
+    if (ptr) {
+        l_info("[gl] glMapBufferOES target=0x%X size=%d nativeMap=1 shadowFallback=0",
+               target, (int)size);
+        return ptr;
+    }
+
     slot->size = size;
     slot->shadow_mapped = 0;
 
     if (slot->size <= 0) {
-        GLenum map_err = glGetError();
-        l_warn("[gl] glMapBufferOES target=0x%X size=%d nativeMap=0 shadowFallback=0 mapErr=0x%X",
-               target, (int)slot->size, map_err);
-        return NULL;
+        slot->size = (target == GL_ELEMENT_ARRAY_BUFFER) ? 0x20000 : 0x100000;
+        l_warn("[gl] glMapBufferOES target=0x%X had unknown size; forcing CPU fallback size=%d",
+               target, (int)slot->size);
     }
 
-    if (!slot->ptr) {
-        slot->ptr = malloc((size_t)slot->size);
-    } else {
-        void *resized = realloc(slot->ptr, (size_t)slot->size);
-        if (resized)
-            slot->ptr = resized;
-    }
-
-    if (!slot->ptr) {
+    if (!ensure_map_fallback_capacity(slot, slot->size)) {
         l_warn("[gl] glMapBufferOES fallback malloc failed: target=0x%X size=%d", target, (int)slot->size);
         return NULL;
     }
 
     slot->shadow_mapped = 1;
-    l_warn("[gl] glMapBufferOES target=0x%X size=%d nativeMap=0 shadowFallback=1",
-           target, (int)slot->size);
+    l_warn("[gl] glMapBufferOES target=0x%X size=%d nativeMap=0 shadowFallback=1 buffer=%u",
+           target, (int)slot->size, tracked_buffer);
     return slot->ptr;
 }
 
