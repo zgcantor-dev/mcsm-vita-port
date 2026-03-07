@@ -38,6 +38,10 @@ static size_t dynamic_static_vertices_size;
 static uint8_t *dynamic_static_indices;
 static size_t dynamic_static_indices_size;
 
+#define STATIC_VERTEX_RECORD_SIZE 16u
+#define STATIC_INDEX_RECORD_SIZE sizeof(uint16_t)
+#define MAX_REASONABLE_STATIC_RECORDS 0x100000u
+
 #define T3VB_BUFFER_ID_OFFSET 0x20
 #define T3VB_COUNT_OFFSET 0xC0
 #define T3VB_STRIDE_OFFSET 0xC4
@@ -217,6 +221,24 @@ static void *get_dynamic_fallback(uint8_t **storage, size_t *storage_size, size_
     return *storage;
 }
 
+static size_t estimate_required_bytes(int count, size_t record_size, size_t emergency_size) {
+    if (count < 0)
+        return emergency_size;
+
+    size_t records = (size_t)count + 1;
+    if (records > MAX_REASONABLE_STATIC_RECORDS)
+        records = MAX_REASONABLE_STATIC_RECORDS;
+
+    if (record_size > 0 && records > (SIZE_MAX / record_size))
+        return emergency_size;
+
+    size_t required = records * record_size;
+    if (required < emergency_size)
+        return emergency_size;
+
+    return required;
+}
+
 static void *begin_static_vertices_patched(void *vertex_buffer, int format, int count) {
     void *result = SO_CONTINUE(void *, begin_static_vertices_hook, vertex_buffer, format, count);
     uintptr_t result_addr = (uintptr_t)result;
@@ -230,7 +252,7 @@ static void *begin_static_vertices_patched(void *vertex_buffer, int format, int 
     if (!result || result_addr == UINTPTR_MAX || result_addr < 0x00100000) {
         // The observed initialization paths write 16 bytes per vertex and may
         // touch one extra record. Keep the estimate conservative.
-        size_t required = (count >= 0 && count < 0x100000) ? ((size_t)count + 1) * 16 : 0;
+        size_t required = estimate_required_bytes(count, STATIC_VERTEX_RECORD_SIZE, sizeof(emergency_static_vertices));
 
         if (required <= sizeof(emergency_static_vertices)) {
             sceClibMemset(emergency_static_vertices, 0, sizeof(emergency_static_vertices));
@@ -246,8 +268,9 @@ static void *begin_static_vertices_patched(void *vertex_buffer, int format, int 
         if (dynamic_fallback)
             return dynamic_fallback;
 
-        l_error("BeginStaticVertices returned bad ptr=0x%08X for format=%d count=%d; estimated %u bytes exceeds emergency buffer and dynamic alloc failed.",
+        l_error("BeginStaticVertices returned bad ptr=0x%08X for format=%d count=%d; estimated %u bytes exceeds emergency buffer and dynamic alloc failed, using emergency scratch buffer.",
                 (unsigned)result_addr, format, count, (unsigned)required);
+        return emergency_static_vertices;
     }
 
     return result;
@@ -258,7 +281,7 @@ static void *begin_static_indices_patched(void *index_buffer, int count) {
     uintptr_t result_addr = (uintptr_t)result;
 
     if (!result || result_addr == UINTPTR_MAX || result_addr < 0x00100000) {
-        size_t required = (count >= 0 && count < 0x100000) ? ((size_t)count + 1) * sizeof(uint16_t) : 0;
+        size_t required = estimate_required_bytes(count, STATIC_INDEX_RECORD_SIZE, sizeof(emergency_static_indices));
 
         if (required <= sizeof(emergency_static_indices)) {
             sceClibMemset(emergency_static_indices, 0, sizeof(emergency_static_indices));
@@ -274,8 +297,9 @@ static void *begin_static_indices_patched(void *index_buffer, int count) {
         if (dynamic_fallback)
             return dynamic_fallback;
 
-        l_error("BeginStaticIndices returned bad ptr=0x%08X for count=%d; estimated %u bytes and no fallback available.",
+        l_error("BeginStaticIndices returned bad ptr=0x%08X for count=%d; estimated %u bytes and no fallback available, using emergency CPU index buffer.",
                 (unsigned)result_addr, count, (unsigned)required);
+        return emergency_static_indices;
     }
 
     return result;
