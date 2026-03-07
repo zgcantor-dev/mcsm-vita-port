@@ -8,6 +8,9 @@
 #include <libc_bridge/libc_bridge.h>
 #include <string>
 #include <fcntl.h>
+#include <vector>
+#include <algorithm>
+#include <dirent.h>
 
 typedef struct assetManager {
     int dummy = 0; // TODO: mb we will need to store something here in future
@@ -21,6 +24,12 @@ typedef struct aAsset {
     size_t fileSize;
     bool opened = false;
 } asset;
+
+typedef struct aAssetDir {
+    std::vector<std::string> entries;
+    size_t index;
+    std::string resolvedPath;
+} assetDir;
 
 static AAssetManager * g_AAssetManager = nullptr;
 
@@ -214,18 +223,71 @@ off_t AAsset_getLength(AAsset* asset) {
 }
 
 AAssetDir* AAssetManager_openDir(AAssetManager* mgr, const char* dirName) {
-    l_error("UNIMPLEMENTED: AAssetManager_openDir: %s", dirName);
-    return (AAssetDir *)strdup("dummy");
+    if (!dirName) {
+        l_warn("AAssetManager_openDir(%p, %p): invalid dirName", mgr, dirName);
+        return nullptr;
+    }
+
+    std::string requested(dirName);
+    std::string dataRoot(DATA_PATH);
+    std::string baseAssets = dataRoot + "assets";
+    std::string baseDirect = dataRoot;
+
+    std::string assetsPath = requested.empty() ? baseAssets : (baseAssets + "/" + requested);
+    std::string directPath = requested.empty() ? baseDirect : (baseDirect + requested);
+
+    DIR *dir = opendir(assetsPath.c_str());
+    std::string resolved = assetsPath;
+    if (!dir) {
+        dir = opendir(directPath.c_str());
+        resolved = directPath;
+    }
+
+    if (!dir) {
+        l_warn("AAssetManager_openDir(%p, \"%s\"): not found in %sassets/ or data root", mgr, dirName, DATA_PATH);
+        return nullptr;
+    }
+
+    auto *result = new assetDir();
+    result->index = 0;
+    result->resolvedPath = resolved;
+
+    while (dirent *entry = readdir(dir)) {
+        if (!entry->d_name || strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        result->entries.emplace_back(entry->d_name);
+    }
+
+    closedir(dir);
+
+    std::sort(result->entries.begin(), result->entries.end());
+
+    l_info("AAssetManager_openDir(%p, \"%s\") -> %p [resolved=%s, entries=%zu]", mgr, dirName, result, result->resolvedPath.c_str(), result->entries.size());
+    return (AAssetDir *)result;
 }
 
 const char* AAssetDir_getNextFileName(AAssetDir* assetDir) {
-    l_error("UNIMPLEMENTED: AAssetDir_getNextFileName: %p", assetDir);
-    return "";
+    if (!assetDir) {
+        l_warn("AAssetDir_getNextFileName(%p): invalid assetDir", assetDir);
+        return nullptr;
+    }
+
+    auto *dir = (struct aAssetDir *) assetDir;
+    if (dir->index >= dir->entries.size()) {
+        return nullptr;
+    }
+
+    const char *name = dir->entries[dir->index].c_str();
+    dir->index++;
+    return name;
 }
 
 void AAssetDir_close(AAssetDir* assetDir) {
-    l_error("UNIMPLEMENTED: AAssetDir_close");
-    free(assetDir);
+    l_debug("AAssetDir_close(%p)", assetDir);
+    if (assetDir) {
+        delete (struct aAssetDir *) assetDir;
+    }
 }
 
 int AAsset_openFileDescriptor(AAsset* asset, off_t* outStart, off_t* outLength) {
