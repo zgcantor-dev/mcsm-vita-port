@@ -33,3 +33,30 @@ int munmap(void *addr, size_t length) {
     if (addr) free(addr);
     return 0;
 }
+
+
+void *memmem_soloader(const void *haystack, size_t haystack_len, const void *needle, size_t needle_len) {
+    if (!haystack || !needle) {
+        return NULL;
+    }
+
+    if (needle_len == 0) {
+        return (void *)haystack;
+    }
+
+    if (haystack_len < needle_len) {
+        return NULL;
+    }
+
+    const unsigned char *hay = (const unsigned char *)haystack;
+    const unsigned char *nee = (const unsigned char *)needle;
+    size_t last = haystack_len - needle_len;
+
+    for (size_t i = 0; i <= last; ++i) {
+        if (hay[i] == nee[0] && memcmp(hay + i, nee, needle_len) == 0) {
+            return (void *)(hay + i);
+        }
+    }
+
+    return NULL;
+}
