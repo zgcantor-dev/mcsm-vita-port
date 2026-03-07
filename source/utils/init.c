@@ -192,6 +192,8 @@ void soloader_init_all() {
 
 #ifdef LOAD_FMOD
     relocate_resolve_init(&fmod_mod);
+    so_patch_fmod(&fmod_mod);
+    so_flush_caches(&fmod_mod);
 #endif
 #ifdef LOAD_FMODSTUDIO
     relocate_resolve_init(&fmodstudio_mod);
