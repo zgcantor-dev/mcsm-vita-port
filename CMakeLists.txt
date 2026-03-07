@@ -87,8 +87,8 @@ add_definitions(-DTELLTALE_TTARCH2_LAYOUT)
 
 # Keep OBB_PATH macro available (OFF by default). If later you implement direct-container reading,
 # enable USE_OBB and point OBB_PATH at the container file.
-set(OBB_PATH "${DATA_PATH}main.com.telltalegames.minecraft100.obb" CACHE STRING "Path to main OBB file")
-set(PATCH_OBB_PATH "${DATA_PATH}patch.com.telltalegames.minecraft100.obb" CACHE STRING "Path to patch OBB file")
+set(OBB_PATH "${DATA_PATH}main.obb" CACHE STRING "Path to main OBB file")
+set(PATCH_OBB_PATH "${DATA_PATH}patch.obb" CACHE STRING "Path to patch OBB file")
 option(USE_OBB "Enable loading assets from OBB" OFF)
 add_definitions(-DOBB_PATH="${OBB_PATH}")
 add_definitions(-DPATCH_OBB_PATH="${PATCH_OBB_PATH}")
