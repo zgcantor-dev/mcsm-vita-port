@@ -60,6 +60,49 @@ static const char *g_android_data_prefixes[] = {
 // void stat_newlib_to_bionic(struct stat * src, stat64_bionic * dst);
 #include "reimpl/bits/_struct_converters.c"
 
+
+static volatile int g_main_obb_open_logged = 0;
+static volatile int g_main_obb_open_done_logged = 0;
+static volatile int g_patch_obb_open_logged = 0;
+static volatile int g_patch_obb_open_done_logged = 0;
+static volatile int g_main_obb_parse_done_logged = 0;
+
+static void log_obb_stage_before_open(const char *kind, const char *filename) {
+    if (!kind || !filename)
+        return;
+
+    if (strcmp(kind, "main") == 0) {
+        if (!g_main_obb_open_logged) {
+            g_main_obb_open_logged = 1;
+            l_info("main: before main obb open (%s)", filename);
+        }
+    } else if (strcmp(kind, "patch") == 0) {
+        if (!g_patch_obb_open_logged) {
+            g_patch_obb_open_logged = 1;
+            l_info("main: before patch obb open (%s)", filename);
+        }
+    }
+}
+
+static void log_obb_stage_after_open(const char *kind, const char *resolved_path, int ok) {
+    if (!kind)
+        return;
+
+    if (strcmp(kind, "main") == 0) {
+        if (!g_main_obb_open_done_logged) {
+            g_main_obb_open_done_logged = 1;
+            l_info("main: after main obb open (%s, ok=%d)", resolved_path ? resolved_path : "(null)", ok);
+            l_info("main: before main obb parse");
+        }
+    } else if (strcmp(kind, "patch") == 0) {
+        if (!g_patch_obb_open_done_logged) {
+            g_patch_obb_open_done_logged = 1;
+            l_info("main: after patch obb open (%s, ok=%d)", resolved_path ? resolved_path : "(null)", ok);
+        }
+    }
+}
+
+
 static const char *detect_telltale_obb_basename(const char *src) {
     if (!src) {
         return NULL;
@@ -132,6 +175,7 @@ static int try_build_obb_candidates(char *dst, size_t dst_size, const char *dir,
 }
 
 static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, char *dst, size_t dst_size) {
+    unsigned int entry_idx = 0;
     if (!dir_path || !basename || !dst || dst_size == 0 || depth > OBB_SCAN_MAX_DEPTH)
         return 0;
 
@@ -142,6 +186,9 @@ static int scan_dir_for_file(const char *dir_path, const char *basename, int dep
     int found = 0;
     struct dirent *entry;
     while (!found && (entry = readdir(dir)) != NULL) {
+        entry_idx++;
+        if ((entry_idx % 100) == 0)
+            l_info("main obb entry %u / ? (dir=%s)", entry_idx, dir_path);
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
 
@@ -358,6 +405,10 @@ static int remap_telltale_extracted_data_path(const char *src, char *dst, size_t
         return 0;
 
     l_info("[path-remap] extracted OBB payload path %s => %s", src, dst);
+    if (!g_main_obb_parse_done_logged) {
+        g_main_obb_parse_done_logged = 1;
+        l_info("main: after main obb parse");
+    }
     return 1;
 }
 
@@ -365,6 +416,9 @@ FILE * fopen_soloader(const char * filename, const char * mode) {
     const char *resolved_filename = filename;
     char remapped_path[PATH_MAX];
     char fallback_path[PATH_MAX];
+    const char *obb_kind = detect_telltale_obb_basename(filename);
+    if (obb_kind)
+        log_obb_stage_before_open(obb_kind, filename);
 
     if (strcmp(filename, "/proc/cpuinfo") == 0) {
         resolved_filename = "app0:/cpuinfo";
@@ -396,6 +450,9 @@ FILE * fopen_soloader(const char * filename, const char * mode) {
         else
             l_warn("fopen(%s => %s, %s): %p", filename, resolved_filename, mode, ret);
 
+        if (obb_kind)
+            log_obb_stage_after_open(obb_kind, resolved_filename, ret != NULL);
+
         return ret;
     }
 
@@ -410,6 +467,9 @@ FILE * fopen_soloader(const char * filename, const char * mode) {
     else
         l_warn("fopen(%s => %s, %s): %p", filename, resolved_filename, mode, ret);
 
+    if (obb_kind)
+        log_obb_stage_after_open(obb_kind, resolved_filename, ret != NULL);
+
     return ret;
 }
 
@@ -417,6 +477,9 @@ int open_soloader(const char * path, int oflag, ...) {
     const char *resolved_path = path;
     char remapped_path[PATH_MAX];
     char fallback_path[PATH_MAX];
+    const char *obb_kind = detect_telltale_obb_basename(path);
+    if (obb_kind)
+        log_obb_stage_before_open(obb_kind, path);
 
     mode_t mode = 0666;
     if (((oflag & BIONIC_O_CREAT) == BIONIC_O_CREAT) ||
@@ -451,6 +514,8 @@ int open_soloader(const char * path, int oflag, ...) {
             l_debug("open(%s => %s, %x): %i", path, resolved_path, open_flags, fd);
         else
             l_warn("open(%s => %s, %x): %i", path, resolved_path, open_flags, fd);
+        if (obb_kind)
+            log_obb_stage_after_open(obb_kind, resolved_path, fd >= 0);
         return fd;
     }
 
@@ -460,6 +525,8 @@ int open_soloader(const char * path, int oflag, ...) {
         l_debug("open(%s => %s, %x): %i", path, resolved_path, oflag, ret);
     else
         l_warn("open(%s => %s, %x): %i", path, resolved_path, oflag, ret);
+    if (obb_kind)
+        log_obb_stage_after_open(obb_kind, resolved_path, ret >= 0);
     return ret;
 }
 
