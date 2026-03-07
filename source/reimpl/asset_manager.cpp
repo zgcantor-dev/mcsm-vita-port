@@ -51,48 +51,65 @@ AAssetManager *AAssetManager_fromJava(void *env, void *assetManager) {
     }
 
     AAssetManager *mgr = AAssetManager_create();
-    l_info("AAssetManager_fromJava(env=%p, assetManager=%p) -> %p (Vita filesystem backend at %s/assets/, fallback=%s%s)",
+    l_info("AAssetManager_fromJava(env=%p, assetManager=%p) -> %p (Vita optional AssetManager shim; fallback=%s%s)",
            env,
            assetManager,
            mgr,
-           DATA_PATH,
            (fallback_env || fallback_obj) ? "yes:" : "no",
            (fallback_env || fallback_obj) ? (fallback_env && fallback_obj ? "null-env+null-assetmgr" : (fallback_env ? "null-env" : "missing-assetmgr")) : "none");
     return mgr;
 }
 
-AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
-    std::string realp = std::string(DATA_PATH) + std::string("assets/") + std::string(filename);
+static FILE *open_asset_path(const char *path) {
+#ifdef USE_SCELIBC_IO
+    return sceLibcBridge_fopen(path, "rb");
+#else
+    return fopen(path, "rb");
+#endif
+}
 
-    auto * a = new aAsset;
-    a->filename = (char *) malloc(realp.length() + 1);
-    strcpy(a->filename, realp.c_str());
+AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
+    if (!filename || filename[0] == '\0') {
+        l_warn("AAssetManager_open(%p, %p, %i): invalid filename", mgr, filename, mode);
+        return nullptr;
+    }
+
+    std::string requested(filename);
+    std::string data_root = std::string(DATA_PATH);
+    std::string assets_path = data_root + std::string("assets/") + requested;
+    std::string direct_path = data_root + requested;
+
+    FILE *f = open_asset_path(assets_path.c_str());
+    const char *resolved = assets_path.c_str();
+
+    if (!f) {
+        f = open_asset_path(direct_path.c_str());
+        resolved = direct_path.c_str();
+    }
+
+    if (!f) {
+        l_warn("AAssetManager_open(%p, \"%s\", %i): not found in %sassets/ or data root; APK assets are optional on Vita", mgr, filename, mode, DATA_PATH);
+        return nullptr;
+    }
+
+    auto *a = new aAsset;
+    a->filename = (char *)malloc(strlen(resolved) + 1);
+    strcpy(a->filename, resolved);
+    a->f = f;
     a->bytesRead = 0;
 
 #ifdef USE_SCELIBC_IO
-    a->f = sceLibcBridge_fopen((const char *)a->filename, "r");
+    sceLibcBridge_fseek(a->f, 0, SEEK_END);
+    a->fileSize = sceLibcBridge_ftell(a->f);
+    sceLibcBridge_fseek(a->f, 0, SEEK_SET);
 #else
-    a->f = fopen((cost char *)a->filename, "r");
+    fseek(a->f, 0, SEEK_END);
+    a->fileSize = ftell(a->f);
+    fseek(a->f, 0, SEEK_SET);
 #endif
+    a->opened = true;
 
-    if (!a->f) {
-        free(a->filename);
-        delete a;
-        a = nullptr;
-    } else {
-#ifdef USE_SCELIBC_IO
-        sceLibcBridge_fseek(a->f, 0, SEEK_END);
-        a->fileSize = sceLibcBridge_ftell(a->f);
-        sceLibcBridge_fseek(a->f, 0, SEEK_SET);
-#else
-        fseek(a->f, 0, SEEK_END);
-        a->fileSize = ftell(a->f);
-        fseek(a->f, 0, SEEK_SET);
-#endif
-        a->opened = true;
-    }
-
-    l_debug("AAssetManager_open<%p>(%p, %s, %i): %p", __builtin_return_address(0), mgr, realp.c_str(), mode, a);
+    l_info("AAssetManager_open(%p, \"%s\", %i) -> %p [resolved=%s]", mgr, filename, mode, a, resolved);
     return (AAsset *) a;
 }
 
