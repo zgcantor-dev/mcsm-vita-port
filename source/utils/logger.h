@@ -45,6 +45,9 @@ extern "C" {
 void _log_print(int t, const char* fmt, ...)
                 __attribute__ ((format (printf, 2, 3)));
 
+void _log_printf(const char* fmt, ...)
+                __attribute__ ((format (printf, 1, 2)));
+
 #ifdef __cplusplus
 };
 #endif

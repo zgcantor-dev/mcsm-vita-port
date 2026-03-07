@@ -220,7 +220,7 @@ void soloader_init_all() {
     return;
 #endif
 
-    sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
+    _log_printf("ENGINE_OK_CONSTRUCTORS_DONE\n");
     g_boot_heartbeat_enabled = 0;
     return;
 }

@@ -9,6 +9,8 @@
 
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/io/fcntl.h>
+#include <psp2/io/stat.h>
 
 #include <stdbool.h>
 #include <stdatomic.h>
@@ -25,16 +27,51 @@
 static SceKernelLwMutexWork _log_mutex;
 static atomic_bool _log_mutex_ready = ATOMIC_VAR_INIT(false);
 
+static SceUID _log_fd = -1;
+static atomic_bool _log_file_attempted = ATOMIC_VAR_INIT(false);
+
 // Buffer A is used to adjust the format string.
 static char buffer_a[2048];
 // Buffer B is used to compile the final log using the updated format string.
 static char buffer_b[2048];
 
+static void _log_write_to_file(const char* text) {
+    if (!text) {
+        return;
+    }
+
+    if (!atomic_load_explicit(&_log_file_attempted, memory_order_relaxed)) {
+        sceIoMkdir("ux0:/data", 0777);
+        _log_fd = sceIoOpen("ux0:/data/mcsm_log.txt",
+                            SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND,
+                            0777);
+        atomic_store_explicit(&_log_file_attempted, true, memory_order_relaxed);
+        if (_log_fd < 0) {
+            sceClibPrintf("Error: failed to open mcsm log file: 0x%x\n", _log_fd);
+        }
+    }
+
+    if (_log_fd >= 0) {
+        sceIoWrite(_log_fd, text, sceClibStrnlen(text, sizeof(buffer_b)));
+    }
+}
+
+void _log_printf(const char* fmt, ...) {
+    char local_buffer[2048];
+    va_list list;
+    va_start(list, fmt);
+    sceClibVsnprintf(local_buffer, sizeof(local_buffer), fmt, list);
+    va_end(list);
+
+    sceClibPrintf("%s", local_buffer);
+    _log_write_to_file(local_buffer);
+}
+
 void _log_print(int t, const char* fmt, ...) {
     if (!atomic_load_explicit(&_log_mutex_ready, memory_order_relaxed)) {
         int ret = sceKernelCreateLwMutex(&_log_mutex, "log_lock", 0, 0, NULL);
         if (ret < 0) {
-            sceClibPrintf("Error: failed to create log mutex: 0x%x\n", ret);
+            _log_printf("Error: failed to create log mutex: 0x%x\n", ret);
             return;
         }
         atomic_store_explicit(&_log_mutex_ready, true, memory_order_relaxed);
@@ -74,7 +111,8 @@ void _log_print(int t, const char* fmt, ...) {
     va_start(list, fmt);
     sceClibVsnprintf(buffer_b, sizeof(buffer_b), buffer_a, list);
     va_end(list);
-    sceClibPrintf(buffer_b);
+    sceClibPrintf("%s", buffer_b);
+    _log_write_to_file(buffer_b);
 
     if (atomic_load_explicit(&_log_mutex_ready, memory_order_relaxed)) {
         sceKernelUnlockLwMutex(&_log_mutex, 1);
