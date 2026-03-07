@@ -56,7 +56,7 @@ void gl_swap() {
 void glShaderSource_soloader(GLuint shader, GLsizei count,
                              const GLchar **string, const GLint *_length) {
 #ifdef DEBUG_OPENGL
-    sceClibPrintf("[gl_dbg] glShaderSource<%p>(shader: %i, count: %i, string: %p, length: %p)\n", __builtin_return_address(0), shader, count, string, _length);
+    _log_printf("[gl_dbg] glShaderSource<%p>(shader: %i, count: %i, string: %p, length: %p)\n", __builtin_return_address(0), shader, count, string, _length);
 #endif
     if (!string) {
         l_error("<%p> Shader source string is NULL, count: %i",
@@ -101,7 +101,7 @@ void glShaderSource_soloader(GLuint shader, GLsizei count,
 
 void glCompileShader_soloader(GLuint shader) {
 #ifdef DEBUG_OPENGL
-    sceClibPrintf("[gl_dbg] glCompileShader<%p>(shader: %i)\n", __builtin_return_address(0), shader);
+    _log_printf("[gl_dbg] glCompileShader<%p>(shader: %i)\n", __builtin_return_address(0), shader);
 #endif
 
 #ifndef USE_GXP_SHADERS

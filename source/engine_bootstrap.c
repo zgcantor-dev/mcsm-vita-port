@@ -29,7 +29,7 @@ int start_engine_via_libGameEngine(void) {
     so_module *engine = &so_mod;
 
     const char *data_root = android_shims_get_data_root();
-    sceClibPrintf("[BOOT] data_root=%s\n", data_root ? data_root : "(null)");
+    _log_printf("[BOOT] data_root=%s\n", data_root ? data_root : "(null)");
 
     SDL_Android_Init();
     SDL_SetMainReady_REAL();
@@ -41,9 +41,9 @@ int start_engine_via_libGameEngine(void) {
     typedef int (*SDLMainFn)(int, char **);
     SDLMainFn sdl_main = (SDLMainFn)so_symbol(engine, "SDL_main");
     if (sdl_main) {
-        sceClibPrintf("[BOOT] calling SDL_main from engine\n");
+        _log_printf("[BOOT] calling SDL_main from engine\n");
         int ret = sdl_main(argc, argv);
-        sceClibPrintf("[BOOT] SDL_main returned %d\n", ret);
+        _log_printf("[BOOT] SDL_main returned %d\n", ret);
         free(argv0);
         return ret;
     }
@@ -62,15 +62,15 @@ int start_engine_via_libGameEngine(void) {
         if (!fn)
             continue;
 
-        sceClibPrintf("[BOOT] calling engine entry: %s @ %p\n", entry_candidates[i], fn);
+        _log_printf("[BOOT] calling engine entry: %s @ %p\n", entry_candidates[i], fn);
         ((void (*)(void))fn)();
-        sceClibPrintf("[BOOT] engine entry returned\n");
+        _log_printf("[BOOT] engine entry returned\n");
         free(argv0);
         return 0;
     }
 
     l_warn("ENGINE_OK_CONSTRUCTORS_DONE (no entrypoint found)");
-    sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
+    _log_printf("ENGINE_OK_CONSTRUCTORS_DONE\n");
     free(argv0);
     return 0;
 }
