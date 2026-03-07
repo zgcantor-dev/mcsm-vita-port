@@ -904,6 +904,7 @@ so_default_dynlib default_dynlib[] = {
         { "sched_get_priority_max", (uintptr_t)&sched_get_priority_max },
         { "sched_get_priority_min", (uintptr_t)&sched_get_priority_min },
         { "sched_yield", (uintptr_t)&sched_yield },
+        { "setpriority", (uintptr_t)&ret0 },
 
 
         // wchar, wctype
