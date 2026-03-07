@@ -25,17 +25,44 @@ extern so_module so_mod;
 
 
 static so_hook fmod_get_userdata_hook;
+static uintptr_t fmod_text_base;
+
+static void *get_fmod_userdata_iface_ptr(void) {
+    if (!fmod_text_base)
+        return NULL;
+
+    // libfmod.so@0x000CD954
+    //   ldr r3, [pc, #0xec] ; [0x000CDA48]
+    //   ldr r3, [pc, r3]    ; [0x000CD968 + r3] -> global slot
+    //   ldr r3, [r3]        ; FMOD globals
+    //   ldr r0, [r3, #0x68] ; userdata iface (may be NULL during startup)
+    uint32_t got_off = *(uint32_t *)(fmod_text_base + 0x000CDA48);
+    void **global_slot = (void **)(fmod_text_base + 0x000CD968 + got_off);
+    if (!global_slot)
+        return NULL;
+
+    void *globals_ref = *global_slot;
+    if (!globals_ref)
+        return NULL;
+
+    void *globals = *(void **)globals_ref;
+    if (!globals)
+        return NULL;
+
+    return *(void **)((uintptr_t)globals + 0x68);
+}
 
 static int fmod_get_userdata_patched(void *instance, void **userdata) {
     if (!instance || !userdata)
         return 31;
 
     // libfmod.so@0x000CD978 does `ldr r3, [r0]` after loading r0 from
-    // [instance + 0x68]. Some startup paths call this entrypoint before that
-    // internal pointer is initialized, causing a null dereference data abort.
+    // the FMOD globals singleton at offset +0x68. Some startup paths call
+    // this entrypoint before that field is initialized, causing a null
+    // dereference data abort.
     // Mirror the library's own failure path and return FMOD_ERR_INTERNAL (28)
     // instead of letting it crash.
-    void *internal_iface = *(void **)((uintptr_t)instance + 0x68);
+    void *internal_iface = get_fmod_userdata_iface_ptr();
     if (!internal_iface) {
         *userdata = NULL;
         return 28;
@@ -47,6 +74,8 @@ static int fmod_get_userdata_patched(void *instance, void **userdata) {
 void so_patch_fmod(so_module *mod) {
     if (!mod)
         return;
+
+    fmod_text_base = mod->text_base;
 
     // JNI_OnLoad+0xA0C in libfmod.so: validates instance/userdata then dereferences instance.
     // Guard null instance to avoid data abort at ldr r3, [r0].
