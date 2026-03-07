@@ -108,7 +108,53 @@ static void configure_system() {
     }
 }
 
+typedef enum BootStage {
+    BOOT_STAGE_START = 0,
+    BOOT_STAGE_BEFORE_SO_INIT,
+    BOOT_STAGE_AFTER_SO_INIT,
+    BOOT_STAGE_BEFORE_GL_INIT,
+    BOOT_STAGE_AFTER_GL_INIT,
+    BOOT_STAGE_BEFORE_GAME_ENTRY,
+    BOOT_STAGE_AFTER_GAME_ENTRY,
+} BootStage;
+
+static volatile int g_boot_stage = BOOT_STAGE_START;
+static volatile int g_boot_heartbeat_enabled = 1;
+
+static int boot_heartbeat_thread(unsigned int arg_size, void *argp) {
+    (void)arg_size;
+    (void)argp;
+
+    while (g_boot_heartbeat_enabled) {
+        l_info("heartbeat: stage=%d", g_boot_stage);
+        sceKernelDelayThread(1000 * 1000);
+    }
+
+    return sceKernelExitDeleteThread(0);
+}
+
+static void set_boot_stage(BootStage stage, const char *message) {
+    g_boot_stage = stage;
+    l_info("%s", message);
+}
+
 void soloader_init_all() {
+    set_boot_stage(BOOT_STAGE_START, "main: start");
+
+    SceUID heartbeat_thread = sceKernelCreateThread("boot_heartbeat",
+                                                    boot_heartbeat_thread,
+                                                    0x10000100,
+                                                    0x10000,
+                                                    0,
+                                                    0,
+                                                    NULL);
+    if (heartbeat_thread >= 0) {
+        sceKernelStartThread(heartbeat_thread, 0, NULL);
+    } else {
+        l_warn("main: heartbeat thread creation failed: 0x%x", heartbeat_thread);
+    }
+
+    set_boot_stage(BOOT_STAGE_BEFORE_SO_INIT, "main: before so init");
     configure_system();
     l_info("logger initialized");
 
@@ -156,16 +202,24 @@ void soloader_init_all() {
     relocate_resolve_init(&main_trace_mod);
 #endif
 
+    set_boot_stage(BOOT_STAGE_AFTER_SO_INIT, "main: after so init");
+
     l_success("Engine libraries loaded + initialized.");
 
+    set_boot_stage(BOOT_STAGE_BEFORE_GL_INIT, "main: before gl_init");
     gl_preload();
+    set_boot_stage(BOOT_STAGE_AFTER_GL_INIT, "main: after gl_init");
     controls_init();
 
 #ifdef LOAD_GAMEENGINE_SO
+    set_boot_stage(BOOT_STAGE_BEFORE_GAME_ENTRY, "main: before game entry");
     start_engine_via_libGameEngine();
+    set_boot_stage(BOOT_STAGE_AFTER_GAME_ENTRY, "main: after game entry");
+    g_boot_heartbeat_enabled = 0;
     return;
 #endif
 
     sceClibPrintf("ENGINE_OK_CONSTRUCTORS_DONE\n");
+    g_boot_heartbeat_enabled = 0;
     return;
 }
