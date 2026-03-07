@@ -39,17 +39,25 @@ AAssetManager * AAssetManager_create() {
 
 
 AAssetManager *AAssetManager_fromJava(void *env, void *assetManager) {
+    const bool fallback_env = (env == nullptr);
+    const bool fallback_obj = (assetManager == nullptr);
+
     if (!env) {
         l_error("AAssetManager_fromJava called with NULL JNIEnv; using Vita filesystem asset manager fallback");
     }
 
     if (!assetManager) {
-        l_warn("AAssetManager_fromJava called with NULL Java AssetManager object; using fallback");
+        l_warn("AAssetManager_fromJava called with NULL/unknown Java AssetManager object (e.g. missing SDLActivity.mAssetMgr); using Vita filesystem fallback");
     }
 
     AAssetManager *mgr = AAssetManager_create();
-    l_info("AAssetManager_fromJava(env=%p, assetManager=%p) -> %p (Vita filesystem backend at %s/assets/)",
-           env, assetManager, mgr, DATA_PATH);
+    l_info("AAssetManager_fromJava(env=%p, assetManager=%p) -> %p (Vita filesystem backend at %s/assets/, fallback=%s%s)",
+           env,
+           assetManager,
+           mgr,
+           DATA_PATH,
+           (fallback_env || fallback_obj) ? "yes:" : "no",
+           (fallback_env || fallback_obj) ? (fallback_env && fallback_obj ? "null-env+null-assetmgr" : (fallback_env ? "null-env" : "missing-assetmgr")) : "none");
     return mgr;
 }
 

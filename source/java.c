@@ -35,6 +35,11 @@ const int SDK_INT = 19; // Android 4.4 / KitKat
 NameToFieldID nameToFieldId[] = {
 		{ 0, "WINDOW_SERVICE", FIELD_TYPE_OBJECT }, 
 		{ 1, "SDK_INT", FIELD_TYPE_INT },
+		// SDL on Android asks org/libsdl/app/SDLActivity.mAssetMgr and passes
+		// it to AAssetManager_fromJava(). On Vita we do not use real Java state,
+		// but exposing this field keeps the JNI probe path alive and lets the
+		// native filesystem-backed AAssetManager shim take over.
+		{ 2, "mAssetMgr", FIELD_TYPE_OBJECT },
 };
 
 FieldsBoolean fieldsBoolean[] = {};
@@ -47,6 +52,7 @@ FieldsInt fieldsInt[] = {
 };
 FieldsObject fieldsObject[] = {
 		{ 0, WINDOW_SERVICE },
+		{ 2, (jobject)0x42424242 },
 };
 FieldsLong fieldsLong[] = {};
 FieldsShort fieldsShort[] = {};
