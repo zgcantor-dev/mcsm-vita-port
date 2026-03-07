@@ -243,6 +243,55 @@ static int remap_telltale_obb_data_path(const char *src, char *dst, size_t dst_s
     return written > 0 && (size_t)written < dst_size;
 }
 
+static const char *find_telltale_obb_payload_relative_path(const char *src) {
+    if (!src)
+        return NULL;
+
+    static const char *obb_markers[] = {
+        "main.com.telltalegames.minecraft100.obb",
+        "patch.com.telltalegames.minecraft100.obb",
+        "main.obb",
+        "patch.obb",
+        NULL,
+    };
+
+    for (int i = 0; obb_markers[i] != NULL; i++) {
+        const char *marker = strstr(src, obb_markers[i]);
+        if (!marker)
+            continue;
+
+        marker += strlen(obb_markers[i]);
+        if (*marker == '/')
+            return marker + 1;
+
+        if (*marker == '\0')
+            return "";
+    }
+
+    return NULL;
+}
+
+static int remap_telltale_extracted_data_path(const char *src, char *dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0)
+        return 0;
+
+    const char *relative = find_telltale_obb_payload_relative_path(src);
+    if (!relative)
+        return 0;
+
+    int written;
+    if (*relative == '\0')
+        written = snprintf(dst, dst_size, "%s", DATA_PATH);
+    else
+        written = snprintf(dst, dst_size, "%s%s", DATA_PATH, relative);
+
+    if (written <= 0 || (size_t)written >= dst_size)
+        return 0;
+
+    l_info("[path-remap] extracted OBB payload path %s => %s", src, dst);
+    return 1;
+}
+
 FILE * fopen_soloader(const char * filename, const char * mode) {
     const char *resolved_filename = filename;
     char remapped_path[PATH_MAX];
@@ -252,6 +301,8 @@ FILE * fopen_soloader(const char * filename, const char * mode) {
         resolved_filename = "app0:/cpuinfo";
     } else if (strcmp(filename, "/proc/meminfo") == 0) {
         resolved_filename = "app0:/meminfo";
+    } else if (remap_telltale_extracted_data_path(filename, remapped_path, sizeof(remapped_path))) {
+        resolved_filename = remapped_path;
     } else if (remap_android_storage_path(filename, remapped_path, sizeof(remapped_path))) {
         resolved_filename = remapped_path;
     } else if (remap_telltale_obb_path(filename, remapped_path, sizeof(remapped_path))) {
@@ -313,6 +364,8 @@ int open_soloader(const char * path, int oflag, ...) {
         resolved_path = "app0:/meminfo";
     } else if (strcmp(path, "/dev/urandom") == 0) {
         resolved_path = "app0:/urandom";
+    } else if (remap_telltale_extracted_data_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
     } else if (remap_android_storage_path(path, remapped_path, sizeof(remapped_path))) {
         resolved_path = remapped_path;
     } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
@@ -363,6 +416,8 @@ int stat_soloader(const char * path, stat64_bionic * buf) {
     }
 
     if (remap_android_storage_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
+    } else if (remap_telltale_extracted_data_path(path, remapped_path, sizeof(remapped_path))) {
         resolved_path = remapped_path;
     } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
         struct stat st;
