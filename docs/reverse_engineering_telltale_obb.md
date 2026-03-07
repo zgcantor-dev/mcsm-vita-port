@@ -119,3 +119,31 @@ rg -n "AAssetManager|SDL_AndroidGetInternalStoragePath|open$|fopen$|read$|lseek$
 /root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=_ZN23ResourceLocationFactory15CreateTTArchiveERK6SymbolRK6StringRK3PtrI10DataStreamE19DataStreamCacheMode references/libGameEngine.so
 /root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=_ZN23ResourceLocationFactory15CreateTTArchiveERK6SymbolRK3PtrI10DataStreamE19DataStreamCacheMode references/libGameEngine.so
 ```
+
+## Additional discovery: `references/libSDL2.so`
+
+A follow-up pass was done to test the hypothesis that custom OBB/TTCN logic might live in the game's SDL build.
+
+### Findings
+
+1. `libSDL2.so` shows Android JNI/storage and file-IO helper symbols (e.g. `SDL_AndroidGetInternalStoragePath_REAL`, `SDL_AndroidGetExternalStoragePath_REAL`, `Android_JNI_FileOpen`).
+2. `libSDL2.so` string scan did **not** reveal TTCN/OBB-specific anchors (`NCTT`, `TTCN`, `.obb`, `Android/obb`, `rescdesc`).
+3. `libSDL2.so` string scan did show SDL logging exports (`SDL_Log*` family), but no game-specific "file found" style message text.
+
+### Interpretation
+
+This suggests `libSDL2.so` is primarily providing generic Android platform glue (JNI, path helpers, file wrappers, logging), while game-specific TTArchive/asset mounting logic remains in `libGameEngine.so` + resource scripts.
+
+So SDL is likely the logging surface, not the location of TTCN container parsing logic.
+
+### Command snippets for this SDL pass
+
+```bash
+strings -a -n 4 references/libSDL2.so > /tmp/libSDL2.strings.txt
+rg -n "NCTT|TTCN|ttarch2?|rescdesc|resdesc|Android/obb|\.obb|com\.telltalegames|minecraft100|AAsset|SDL_Log|Successfully created context|24-bit depth|storage/emulated|/sdcard" /tmp/libSDL2.strings.txt
+
+/root/.swiftly/bin/llvm-objdump --dynamic-syms references/libSDL2.so > /tmp/libSDL2.dynsym.txt
+rg -n "\*UND\*|AAsset|open|fopen|read|lseek|stat|opendir|readdir|SDL_Android|JNI|Java|obb|ttarch|rescdesc" /tmp/libSDL2.dynsym.txt
+
+/root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=SDL_AndroidGetInternalStoragePath_REAL --disassemble-symbols=SDL_AndroidGetExternalStoragePath_REAL --disassemble-symbols=Android_JNI_FileOpen references/libSDL2.so
+```
