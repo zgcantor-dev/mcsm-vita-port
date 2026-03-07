@@ -18,8 +18,12 @@
 #include <psp2/kernel/threadmgr.h>
 
 #define TELLTALE_PKG_NAME "com.telltalegames.minecraft100"
+#define TELLTALE_OBB_VERSION "40137"
 #define TELLTALE_OBB_DIR "/Android/obb/" TELLTALE_PKG_NAME "/"
 #define VITA_OBB_DIR "ux0:" TELLTALE_OBB_DIR
+
+#define TELLTALE_MAIN_OBB_VERSIONED "main." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
+#define TELLTALE_PATCH_OBB_VERSIONED "patch." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
 
 #define OBB_SCAN_MAX_DEPTH 5
 
@@ -66,12 +70,12 @@ static const char *detect_telltale_obb_basename(const char *src) {
     const char *filename = strrchr(src, '/');
     filename = filename ? filename + 1 : src;
 
-    if (strcmp(src, OBB_PATH) == 0 || strstr(src, "main.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "main.obb") != NULL ||
+    if (strcmp(src, OBB_PATH) == 0 || strstr(src, TELLTALE_MAIN_OBB_VERSIONED) != NULL || strstr(src, "main.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "main.obb") != NULL ||
         (strncmp(filename, "main.", 5) == 0 && strstr(filename, ".com.telltalegames.minecraft100.obb") != NULL)) {
-        basename = "main.obb";
-    } else if (strcmp(src, PATCH_OBB_PATH) == 0 || strstr(src, "patch.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "patch.obb") != NULL ||
+        basename = "main";
+    } else if (strcmp(src, PATCH_OBB_PATH) == 0 || strstr(src, TELLTALE_PATCH_OBB_VERSIONED) != NULL || strstr(src, "patch.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "patch.obb") != NULL ||
                (strncmp(filename, "patch.", 6) == 0 && strstr(filename, ".com.telltalegames.minecraft100.obb") != NULL)) {
-        basename = "patch.obb";
+        basename = "patch";
     } else {
         const char *obb_pos = strstr(src, TELLTALE_OBB_DIR);
         if (!obb_pos)
@@ -79,9 +83,9 @@ static const char *detect_telltale_obb_basename(const char *src) {
 
         const char *candidate = obb_pos + strlen(TELLTALE_OBB_DIR);
         if (strncmp(candidate, "main", 4) == 0) {
-            basename = "main.obb";
+            basename = "main";
         } else if (strncmp(candidate, "patch", 5) == 0) {
-            basename = "patch.obb";
+            basename = "patch";
         }
     }
 
@@ -102,6 +106,29 @@ static int try_build_obb_candidate(char *dst, size_t dst_size, const char *dir, 
         return 0;
 
     return path_exists_local(dst);
+}
+
+static int try_build_obb_candidates(char *dst, size_t dst_size, const char *dir, const char *obb_kind) {
+    if (!dst || dst_size == 0 || !dir || !obb_kind)
+        return 0;
+
+    if (strcmp(obb_kind, "main") == 0) {
+        if (try_build_obb_candidate(dst, dst_size, dir, TELLTALE_MAIN_OBB_VERSIONED))
+            return 1;
+        if (try_build_obb_candidate(dst, dst_size, dir, "main.com.telltalegames.minecraft100.obb"))
+            return 1;
+        if (try_build_obb_candidate(dst, dst_size, dir, "main.obb"))
+            return 1;
+    } else if (strcmp(obb_kind, "patch") == 0) {
+        if (try_build_obb_candidate(dst, dst_size, dir, TELLTALE_PATCH_OBB_VERSIONED))
+            return 1;
+        if (try_build_obb_candidate(dst, dst_size, dir, "patch.com.telltalegames.minecraft100.obb"))
+            return 1;
+        if (try_build_obb_candidate(dst, dst_size, dir, "patch.obb"))
+            return 1;
+    }
+
+    return 0;
 }
 
 static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, char *dst, size_t dst_size) {
@@ -152,29 +179,59 @@ static int scan_dir_for_file(const char *dir_path, const char *basename, int dep
     return found;
 }
 
-static int resolve_telltale_obb_path(const char *basename, char *dst, size_t dst_size) {
-    if (!basename || !dst || dst_size == 0)
+static int resolve_telltale_obb_path(const char *obb_kind, char *dst, size_t dst_size) {
+    if (!obb_kind || !dst || dst_size == 0)
         return 0;
 
     // Primary Android-like location.
-    if (try_build_obb_candidate(dst, dst_size, VITA_OBB_DIR, basename))
+    if (try_build_obb_candidates(dst, dst_size, VITA_OBB_DIR, obb_kind))
         return 1;
 
     // Common Vita layouts used by ports/users.
-    if (try_build_obb_candidate(dst, dst_size, DATA_PATH, basename))
+    if (try_build_obb_candidates(dst, dst_size, DATA_PATH, obb_kind))
         return 1;
 
-    if (try_build_obb_candidate(dst, dst_size, DATA_PATH "obb/", basename))
+    if (try_build_obb_candidates(dst, dst_size, DATA_PATH "obb/", obb_kind))
         return 1;
 
-    if (try_build_obb_candidate(dst, dst_size, DATA_PATH "Android/obb/" TELLTALE_PKG_NAME "/", basename))
+    if (try_build_obb_candidates(dst, dst_size, DATA_PATH "Android/obb/" TELLTALE_PKG_NAME "/", obb_kind))
         return 1;
 
     // Last resort: scan under data root for these known OBB names.
-    if (scan_dir_for_file(DATA_PATH, basename, 0, dst, dst_size))
-        return 1;
+    if (strcmp(obb_kind, "main") == 0) {
+        if (scan_dir_for_file(DATA_PATH, TELLTALE_MAIN_OBB_VERSIONED, 0, dst, dst_size))
+            return 1;
+        if (scan_dir_for_file(DATA_PATH, "main.com.telltalegames.minecraft100.obb", 0, dst, dst_size))
+            return 1;
+        if (scan_dir_for_file(DATA_PATH, "main.obb", 0, dst, dst_size))
+            return 1;
+    } else if (strcmp(obb_kind, "patch") == 0) {
+        if (scan_dir_for_file(DATA_PATH, TELLTALE_PATCH_OBB_VERSIONED, 0, dst, dst_size))
+            return 1;
+        if (scan_dir_for_file(DATA_PATH, "patch.com.telltalegames.minecraft100.obb", 0, dst, dst_size))
+            return 1;
+        if (scan_dir_for_file(DATA_PATH, "patch.obb", 0, dst, dst_size))
+            return 1;
+    }
 
     return 0;
+}
+
+static int default_telltale_obb_path(const char *obb_kind, char *dst, size_t dst_size) {
+    if (!obb_kind || !dst || dst_size == 0)
+        return 0;
+
+    const char *versioned = NULL;
+    if (strcmp(obb_kind, "main") == 0) {
+        versioned = TELLTALE_MAIN_OBB_VERSIONED;
+    } else if (strcmp(obb_kind, "patch") == 0) {
+        versioned = TELLTALE_PATCH_OBB_VERSIONED;
+    } else {
+        return 0;
+    }
+
+    int written = snprintf(dst, dst_size, "%s%s", VITA_OBB_DIR, versioned);
+    return written > 0 && (size_t)written < dst_size;
 }
 
 static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) {
@@ -182,15 +239,14 @@ static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) 
         return 0;
     }
 
-    const char *basename = detect_telltale_obb_basename(src);
-    if (!basename)
+    const char *obb_kind = detect_telltale_obb_basename(src);
+    if (!obb_kind)
         return 0;
 
-    if (resolve_telltale_obb_path(basename, dst, dst_size))
+    if (resolve_telltale_obb_path(obb_kind, dst, dst_size))
         return 1;
 
-    int written = snprintf(dst, dst_size, "%s%s", VITA_OBB_DIR, basename);
-    return written > 0 && (size_t)written < dst_size;
+    return default_telltale_obb_path(obb_kind, dst, dst_size);
 }
 
 static int remap_android_storage_path(const char *src, char *dst, size_t dst_size) {
@@ -235,11 +291,22 @@ static int remap_telltale_obb_data_path(const char *src, char *dst, size_t dst_s
         return 0;
     }
 
-    const char *basename = detect_telltale_obb_basename(src);
-    if (!basename)
+    const char *obb_kind = detect_telltale_obb_basename(src);
+    if (!obb_kind)
         return 0;
 
-    int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, basename);
+    if (strcmp(obb_kind, "main") == 0) {
+        int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, TELLTALE_MAIN_OBB_VERSIONED);
+        if (written > 0 && (size_t)written < dst_size)
+            return 1;
+        written = snprintf(dst, dst_size, "%s%s", DATA_PATH, "main.obb");
+        return written > 0 && (size_t)written < dst_size;
+    }
+
+    int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, TELLTALE_PATCH_OBB_VERSIONED);
+    if (written > 0 && (size_t)written < dst_size)
+        return 1;
+    written = snprintf(dst, dst_size, "%s%s", DATA_PATH, "patch.obb");
     return written > 0 && (size_t)written < dst_size;
 }
 
@@ -248,6 +315,8 @@ static const char *find_telltale_obb_payload_relative_path(const char *src) {
         return NULL;
 
     static const char *obb_markers[] = {
+        TELLTALE_MAIN_OBB_VERSIONED,
+        TELLTALE_PATCH_OBB_VERSIONED,
         "main.com.telltalegames.minecraft100.obb",
         "patch.com.telltalegames.minecraft100.obb",
         "main.obb",

@@ -2,11 +2,60 @@
 #include <falso_jni/FalsoJNI_Impl.h>
 #include <falso_jni/FalsoJNI_Logger.h>
 
+#define TELLTALE_PKG_NAME "com.telltalegames.minecraft100"
+#define TELLTALE_OBB_VERSION "40137"
+#define TELLTALE_EXTERNAL_STORAGE_ROOT "/storage/emulated/0"
+
+#define TELLTALE_MAIN_OBB_ANDROID_PATH TELLTALE_EXTERNAL_STORAGE_ROOT "/Android/obb/" TELLTALE_PKG_NAME "/main." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
+#define TELLTALE_PATCH_OBB_ANDROID_PATH TELLTALE_EXTERNAL_STORAGE_ROOT "/Android/obb/" TELLTALE_PKG_NAME "/patch." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
+
+static jobject jni_getObbFileName(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+
+	// Some builds call getObbFileName() once for main and derive patch path.
+	// Others query for each file. Return main first, then patch, then keep
+	// returning patch so any repeated patch checks remain stable.
+	static int call_count = 0;
+	const char *path = (call_count++ == 0) ? TELLTALE_MAIN_OBB_ANDROID_PATH : TELLTALE_PATCH_OBB_ANDROID_PATH;
+	return jni->NewStringUTF(jni, path);
+}
+
+static jobject jni_getExternalStorageDirectory(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
+}
+
+static jobject jni_getExternalStorageDirs(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+
+	jclass string_class = jni->FindClass(jni, "java/lang/String");
+	if (!string_class)
+		return NULL;
+
+	jobjectArray dirs = jni->NewObjectArray(jni, 1, string_class, NULL);
+	if (!dirs)
+		return NULL;
+
+	jstring root = jni->NewStringUTF(jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
+	if (!root)
+		return dirs;
+
+	jni->SetObjectArrayElement(jni, dirs, 0, root);
+	return dirs;
+}
+
 /*
  * JNI Methods
 */
 
-NameToMethodID nameToMethodId[] = {};
+NameToMethodID nameToMethodId[] = {
+		{ 100, "getObbFileName", METHOD_TYPE_OBJECT },
+		{ 101, "getExternalStorageDirectory", METHOD_TYPE_OBJECT },
+		{ 102, "getExternalStorageDirs", METHOD_TYPE_OBJECT },
+};
 
 MethodsBoolean methodsBoolean[] = {};
 MethodsByte methodsByte[] = {};
@@ -15,7 +64,11 @@ MethodsDouble methodsDouble[] = {};
 MethodsFloat methodsFloat[] = {};
 MethodsInt methodsInt[] = {};
 MethodsLong methodsLong[] = {};
-MethodsObject methodsObject[] = {};
+MethodsObject methodsObject[] = {
+		{ 100, jni_getObbFileName },
+		{ 101, jni_getExternalStorageDirectory },
+		{ 102, jni_getExternalStorageDirs },
+};
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {};
 
