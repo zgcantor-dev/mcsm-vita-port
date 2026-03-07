@@ -18,32 +18,32 @@ static jobject jni_getObbFileName(jmethodID id, va_list args) {
 	// returning patch so any repeated patch checks remain stable.
 	static int call_count = 0;
 	const char *path = (call_count++ == 0) ? TELLTALE_MAIN_OBB_ANDROID_PATH : TELLTALE_PATCH_OBB_ANDROID_PATH;
-	return jni->NewStringUTF(jni, path);
+	return jni->NewStringUTF(&jni, path);
 }
 
 static jobject jni_getExternalStorageDirectory(jmethodID id, va_list args) {
 	(void)id;
 	(void)args;
-	return jni->NewStringUTF(jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
+	return jni->NewStringUTF(&jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
 }
 
 static jobject jni_getExternalStorageDirs(jmethodID id, va_list args) {
 	(void)id;
 	(void)args;
 
-	jclass string_class = jni->FindClass(jni, "java/lang/String");
+	jclass string_class = jni->FindClass(&jni, "java/lang/String");
 	if (!string_class)
 		return NULL;
 
-	jobjectArray dirs = jni->NewObjectArray(jni, 1, string_class, NULL);
+	jobjectArray dirs = jni->NewObjectArray(&jni, 1, string_class, NULL);
 	if (!dirs)
 		return NULL;
 
-	jstring root = jni->NewStringUTF(jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
+	jstring root = jni->NewStringUTF(&jni, TELLTALE_EXTERNAL_STORAGE_ROOT);
 	if (!root)
 		return dirs;
 
-	jni->SetObjectArrayElement(jni, dirs, 0, root);
+	jni->SetObjectArrayElement(&jni, dirs, 0, root);
 	return dirs;
 }
 

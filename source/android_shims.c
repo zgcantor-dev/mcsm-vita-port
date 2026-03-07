@@ -1,6 +1,7 @@
 #include "android_shims.h"
 
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/clib.h>
 
 #include <stdio.h>
