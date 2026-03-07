@@ -73,6 +73,12 @@ static void relocate_resolve_init(so_module *mod) {
     so_initialize(mod);
 }
 
+static void relocate_resolve_no_init(so_module *mod) {
+    so_relocate(mod);
+    resolve_imports(mod);
+    so_flush_caches(mod);
+}
+
 static void relocate_resolve_patch_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
@@ -191,12 +197,17 @@ void soloader_init_all() {
 #endif
 
 #ifdef LOAD_FMOD
-    relocate_resolve_init(&fmod_mod);
+    // libfmod's JNI_OnLoad dereferences Android runtime state that is absent on Vita
+    // and crashes during constructors (null JavaVM table). Keep it relocated/resolved,
+    // but skip constructor execution.
+    relocate_resolve_no_init(&fmod_mod);
     so_patch_fmod(&fmod_mod);
     so_flush_caches(&fmod_mod);
 #endif
 #ifdef LOAD_FMODSTUDIO
-    relocate_resolve_init(&fmodstudio_mod);
+    // Keep initialization strategy consistent with libfmod: avoid Android-only
+    // constructor side effects in FMOD runtime libs.
+    relocate_resolve_no_init(&fmodstudio_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     relocate_resolve_patch_init(&gameengine_mod);
