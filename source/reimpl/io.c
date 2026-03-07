@@ -68,10 +68,10 @@ static const char *detect_telltale_obb_basename(const char *src) {
 
     if (strcmp(src, OBB_PATH) == 0 || strstr(src, "main.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "main.obb") != NULL ||
         (strncmp(filename, "main.", 5) == 0 && strstr(filename, ".com.telltalegames.minecraft100.obb") != NULL)) {
-        basename = "main.com.telltalegames.minecraft100.obb";
+        basename = "main.obb";
     } else if (strcmp(src, PATCH_OBB_PATH) == 0 || strstr(src, "patch.com.telltalegames.minecraft100.obb") != NULL || strstr(src, "patch.obb") != NULL ||
                (strncmp(filename, "patch.", 6) == 0 && strstr(filename, ".com.telltalegames.minecraft100.obb") != NULL)) {
-        basename = "patch.com.telltalegames.minecraft100.obb";
+        basename = "patch.obb";
     } else {
         const char *obb_pos = strstr(src, TELLTALE_OBB_DIR);
         if (!obb_pos)
@@ -79,9 +79,9 @@ static const char *detect_telltale_obb_basename(const char *src) {
 
         const char *candidate = obb_pos + strlen(TELLTALE_OBB_DIR);
         if (strncmp(candidate, "main", 4) == 0) {
-            basename = "main.com.telltalegames.minecraft100.obb";
+            basename = "main.obb";
         } else if (strncmp(candidate, "patch", 5) == 0) {
-            basename = "patch.com.telltalegames.minecraft100.obb";
+            basename = "patch.obb";
         }
     }
 
