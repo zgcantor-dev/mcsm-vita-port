@@ -208,3 +208,78 @@ strings -a -n 4 -t x references/libGameEngine.so | grep -Ei 'obb|ttarch2|Resourc
 # focused window around core main/patch OBB branches
 /root/.swiftly/bin/llvm-objdump -d --start-address=0x58ec6c --stop-address=0x58ef10 references/libGameEngine.so
 ```
+
+## Implementation-path checklist: what is still needed
+
+Based on discovery so far, there are two viable compatibility strategies.
+
+### Method A — "Direct OBB" (match engine startup path)
+
+Target: satisfy `Platform_Android::RegisterGameDataDirectories` so engine loads main/patch OBB via `TTArchive::Load`.
+
+#### Required pieces
+
+1. **OBB path resolution must return valid file paths** used by the engine's OBB branch.
+2. **`open/stat` on those paths must succeed** (engine logs explicit `... does not exist` otherwise).
+3. **`DataStreamFactory::CreateFileStream` must be fed real OBB files** that `TTArchive::Load` can parse.
+4. **Both main and patch handling should be supported**, since code has separate branches/messages for each.
+
+#### Discovery clues supporting this
+
+- OBB-specific strings in engine (`Using main obb ...`, `main obb ... does not exist`, `patch obb ... does not exist`, `Using patch obb ...`).
+- OBB branch calls: `CreateFileStream` -> `TTArchive::Load` -> `ResourceDirectory_TTArchive`.
+
+### Method B — "Extracted assets only" (bypass/avoid OBB reliance)
+
+Target: ensure resource scripts can mount `*.ttarch2` + `_rescdesc_*.lua` directly from filesystem without requiring OBB stream path.
+
+#### Required pieces
+
+1. Correct extracted layout and exact filenames/case for descriptor + archive files.
+2. Path remapping must resolve all requested paths into those extracted files.
+3. Resource script functions (`ResourceCreateConcreteArchiveLocation` flow) must see expected archive names.
+
+#### Risk
+
+Engine clearly has direct OBB startup path; if that path is taken before script-only fallback, extracted-only mode may still fail unless OBB discovery is neutralized or redirected cleanly.
+
+## Critical JNI gap discovered for OBB path method
+
+Current port JNI method tables are empty (`nameToMethodId[] = {}` and all `methods*[] = {}`), while engine strings show Android activity/JNI method names related to OBB and storage, including:
+
+- `getObbFileName`
+- `getExternalStorageDirectory`
+- `android.permission.READ_EXTERNAL_STORAGE`
+- activity class names (`com/telltalegames/telltale/TelltaleActivity`, `org/libsdl/app/SDLActivity`)
+
+In FalsoJNI bridge, unresolved methods return null/false/0 and log warnings (`method ID ... not found!`).
+
+### Why this matters
+
+If OBB path discovery in engine depends on these Java method callbacks, the current empty JNI method map can cause null/invalid paths, which would trigger the engine's `... does not exist` path and prevent OBB mount.
+
+## Practical next implementation tasks (ordered)
+
+1. **Instrument and log actual OBB path strings at runtime** right before `open/stat` (in so_loader wrappers) to confirm what engine asks for.
+2. **Implement minimal JNI methods for OBB/storage path discovery** (at least those seen in strings) or hard-wire equivalent behavior in shims.
+3. **Make OBB path remap deterministic** for both main and patch names to real Vita locations.
+4. Keep extracted-data remap as fallback path for script-driven archive mounting.
+5. Re-test and classify which startup path is being used on-device (direct OBB branch vs extracted-only branch).
+
+## Commands used for this additional discovery
+
+```bash
+# contextual string mining with addresses
+strings -a -n 4 -t x references/libGameEngine.so
+
+# locate key Android/OBB strings
+rg -n "getObbFileName|getExternalStorageDirectory|READ_EXTERNAL_STORAGE|Using main obb|patch obb|TelltaleActivity|SDLActivity|ResourceCreateConcreteArchiveLocation|\.ttarch2" /tmp/libGameEngine.strings_addr.txt
+
+# inspect engine path/setup and OBB registration flows
+/root/.swiftly/bin/llvm-objdump --dynamic-syms references/libGameEngine.so
+/root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=_ZN16Platform_Android20GetBaseUserDirectoryEv references/libGameEngine.so
+/root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=_ZN16Platform_Android27RegisterGameDataDirectoriesEv references/libGameEngine.so
+
+# verify current port JNI implementation status
+rg -n "nameToMethodId|MethodsObject|methodsObject|mAssetMgr" source/java.c lib/falso_jni/FalsoJNI_ImplBridge.c
+```
