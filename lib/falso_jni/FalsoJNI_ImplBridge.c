@@ -29,6 +29,14 @@ jfieldID getFieldIdByName(const char* name) {
         }
     }
 
+    // SDL's Android bootstrap probes SDLActivity.mAssetMgr before invoking
+    // AAssetManager_fromJava(). On Vita this Java side does not exist and the
+    // native fallback path can safely continue with a stub object.
+    if (name && strcmp(name, "mAssetMgr") == 0) {
+        fjni_logv_warn("Unknown field name \"%s\"; returning fallback field ID for Vita asset-manager shim", name);
+        return (jfieldID)2;
+    }
+
     fjni_logv_warn("Unknown field name \"%s\"", name);
     return NULL;
 }

@@ -23,6 +23,26 @@
 
 #define OBB_SCAN_MAX_DEPTH 5
 
+#define ANDROID_OBB_REL_DIR "Android/obb/" TELLTALE_PKG_NAME "/"
+#define ANDROID_DATA_FILES_REL_DIR "Android/data/" TELLTALE_PKG_NAME "/files/"
+
+static const char *g_android_obb_prefixes[] = {
+    "/storage/emulated/0/" ANDROID_OBB_REL_DIR,
+    "/sdcard/" ANDROID_OBB_REL_DIR,
+    "/mnt/sdcard/" ANDROID_OBB_REL_DIR,
+    "/data/media/0/" ANDROID_OBB_REL_DIR,
+    NULL,
+};
+
+static const char *g_android_data_prefixes[] = {
+    "/storage/emulated/0/" ANDROID_DATA_FILES_REL_DIR,
+    "/sdcard/" ANDROID_DATA_FILES_REL_DIR,
+    "/mnt/sdcard/" ANDROID_DATA_FILES_REL_DIR,
+    "/data/data/" TELLTALE_PKG_NAME "/files/",
+    "/data/user/0/" TELLTALE_PKG_NAME "/files/",
+    NULL,
+};
+
 #ifdef USE_SCELIBC_IO
 #include <libc_bridge/libc_bridge.h>
 #endif
@@ -173,6 +193,43 @@ static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) 
     return written > 0 && (size_t)written < dst_size;
 }
 
+static int remap_android_storage_path(const char *src, char *dst, size_t dst_size) {
+    if (!src || !dst || dst_size == 0)
+        return 0;
+
+    for (int i = 0; g_android_data_prefixes[i] != NULL; i++) {
+        const char *prefix = g_android_data_prefixes[i];
+        size_t prefix_len = strlen(prefix);
+        if (strncmp(src, prefix, prefix_len) == 0) {
+            const char *relative = src + prefix_len;
+            int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, relative);
+            if (written > 0 && (size_t)written < dst_size) {
+                l_info("[path-remap] Android data path %s => %s", src, dst);
+                return 1;
+            }
+            l_warn("[path-remap] Android data path remap overflow for %s", src);
+            return 0;
+        }
+    }
+
+    for (int i = 0; g_android_obb_prefixes[i] != NULL; i++) {
+        const char *prefix = g_android_obb_prefixes[i];
+        size_t prefix_len = strlen(prefix);
+        if (strncmp(src, prefix, prefix_len) == 0) {
+            const char *basename = src + prefix_len;
+            int written = snprintf(dst, dst_size, "%s%s", VITA_OBB_DIR, basename);
+            if (written > 0 && (size_t)written < dst_size) {
+                l_info("[path-remap] Android OBB path %s => %s", src, dst);
+                return 1;
+            }
+            l_warn("[path-remap] Android OBB path remap overflow for %s", src);
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
 static int remap_telltale_obb_data_path(const char *src, char *dst, size_t dst_size) {
     if (!dst || dst_size == 0) {
         return 0;
@@ -195,6 +252,8 @@ FILE * fopen_soloader(const char * filename, const char * mode) {
         resolved_filename = "app0:/cpuinfo";
     } else if (strcmp(filename, "/proc/meminfo") == 0) {
         resolved_filename = "app0:/meminfo";
+    } else if (remap_android_storage_path(filename, remapped_path, sizeof(remapped_path))) {
+        resolved_filename = remapped_path;
     } else if (remap_telltale_obb_path(filename, remapped_path, sizeof(remapped_path))) {
 #ifdef USE_SCELIBC_IO
         FILE *ret = sceLibcBridge_fopen(remapped_path, mode);
@@ -254,6 +313,8 @@ int open_soloader(const char * path, int oflag, ...) {
         resolved_path = "app0:/meminfo";
     } else if (strcmp(path, "/dev/urandom") == 0) {
         resolved_path = "app0:/urandom";
+    } else if (remap_android_storage_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
     } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
         int open_flags = oflags_bionic_to_newlib(oflag);
         int fd = open(remapped_path, open_flags, mode);
@@ -301,7 +362,9 @@ int stat_soloader(const char * path, stat64_bionic * buf) {
         return 0;
     }
 
-    if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
+    if (remap_android_storage_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
+    } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
         struct stat st;
         int res = stat(remapped_path, &st);
 
