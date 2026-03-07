@@ -23,6 +23,24 @@
 
 extern so_module so_mod;
 
+
+static so_hook fmod_get_userdata_hook;
+
+static int fmod_get_userdata_patched(void *instance, void **userdata) {
+    if (!instance || !userdata)
+        return 31;
+
+    return SO_CONTINUE(int, fmod_get_userdata_hook, instance, userdata);
+}
+
+void so_patch_fmod(so_module *mod) {
+    if (!mod)
+        return;
+
+    // JNI_OnLoad+0xA0C in libfmod.so: validates instance/userdata then dereferences instance.
+    // Guard null instance to avoid data abort at ldr r3, [r0].
+    fmod_get_userdata_hook = hook_addr(mod->text_base + 0x000CD940, (uintptr_t)&fmod_get_userdata_patched);
+}
 static so_hook begin_static_vertices_hook;
 static so_hook begin_static_indices_hook;
 static so_hook vertex_buffer_lock_hook;

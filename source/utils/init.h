@@ -22,6 +22,7 @@ extern "C" {
 void resolve_imports(so_module *mod);
 
 void so_patch();
+void so_patch_fmod(so_module *mod);
 
 void soloader_init_all();
 
