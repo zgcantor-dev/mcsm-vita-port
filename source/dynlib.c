@@ -234,6 +234,7 @@ so_default_dynlib default_dynlib[] = {
         { "SDL_AndroidGetJNIEnv", (uintptr_t)&SDL_AndroidGetJNIEnv },
         { "SDL_AndroidGetInternalStoragePath", (uintptr_t)&SDL_AndroidGetInternalStoragePath },
         { "SDL_AndroidGetExternalStorageState", (uintptr_t)&SDL_AndroidGetExternalStorageState },
+        { "Android_JNI_SetupThread", (uintptr_t)&Android_JNI_SetupThread },
         { "SDL_CreateWindow", (uintptr_t)&SDL_CreateWindow_logged },
         { "SDL_Delay", (uintptr_t)&SDL_Delay },
         { "SDL_DestroyWindow", (uintptr_t)&SDL_DestroyWindow },

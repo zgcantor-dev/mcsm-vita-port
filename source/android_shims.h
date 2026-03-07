@@ -29,6 +29,7 @@ void *SDL_AndroidGetJNIEnv(void);
 const char *SDL_AndroidGetInternalStoragePath(void);
 int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
+int Android_JNI_SetupThread(void);
 void SDL_SetMainReady_REAL(void);
 int gettid(void);
 

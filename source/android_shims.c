@@ -180,6 +180,10 @@ int SDL_Android_Init(void) {
     return 0;
 }
 
+int Android_JNI_SetupThread(void) {
+    return 1;
+}
+
 void SDL_SetMainReady_REAL(void) {
 #ifdef USE_SDL2
     SDL_SetMainReady();
@@ -481,6 +485,7 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_AndroidGetInternalStoragePath", (void *)&SDL_AndroidGetInternalStoragePath },
     { "SDL_AndroidGetExternalStorageState", (void *)&SDL_AndroidGetExternalStorageState },
     { "SDL_Android_Init", (void *)&SDL_Android_Init },
+    { "Android_JNI_SetupThread", (void *)&Android_JNI_SetupThread },
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
     { "glMapBufferOES", (void *)&glMapBufferOES_soloader },
     { "glUnmapBufferOES", (void *)&glUnmapBufferOES_soloader },
