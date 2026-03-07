@@ -94,6 +94,10 @@ int ioctl_soloader(int fd, int request, ... /* arg */);
 
 int fsync_soloader(int fd);
 
+ssize_t pread_soloader(int fd, void *buf, size_t count, off_t offset);
+
+ssize_t pwrite_soloader(int fd, const void *buf, size_t count, off_t offset);
+
 #ifdef __cplusplus
 };
 #endif

@@ -661,3 +661,35 @@ int fsync_soloader(int fd) {
     l_debug("fsync(%i): %i", fd, ret);
     return ret;
 }
+
+ssize_t pread_soloader(int fd, void *buf, size_t count, off_t offset) {
+    off_t current = lseek(fd, 0, SEEK_CUR);
+    if (current < 0)
+        return -1;
+
+    if (lseek(fd, offset, SEEK_SET) < 0)
+        return -1;
+
+    ssize_t result = read(fd, buf, count);
+    off_t restore = lseek(fd, current, SEEK_SET);
+    if (restore < 0 && result >= 0)
+        return -1;
+
+    return result;
+}
+
+ssize_t pwrite_soloader(int fd, const void *buf, size_t count, off_t offset) {
+    off_t current = lseek(fd, 0, SEEK_CUR);
+    if (current < 0)
+        return -1;
+
+    if (lseek(fd, offset, SEEK_SET) < 0)
+        return -1;
+
+    ssize_t result = write(fd, buf, count);
+    off_t restore = lseek(fd, current, SEEK_SET);
+    if (restore < 0 && result >= 0)
+        return -1;
+
+    return result;
+}
