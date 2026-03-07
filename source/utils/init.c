@@ -22,6 +22,7 @@
 #include <psp2/appmgr.h>
 #include <psp2/apputil.h>
 #include <psp2/kernel/clib.h>
+#include <psp2/kernel/threadmgr.h>
 #include <psp2/power.h>
 
 #include <falso_jni/FalsoJNI.h>
