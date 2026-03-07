@@ -171,16 +171,16 @@ int pthread_create_soloader(pthread_t *thread, const pthread_attr_t_bionic *attr
     int ret;
 
     if (!attr) {
-        pthread_attr_t a;
-        pthread_attr_init(&a);
-        pthread_attr_setstacksize(&a, 512 * 1024);
-        ret = pthread_create(thread, &a, start, param);
-        pthread_attr_destroy(&a);
+        ret = pthread_create(thread, NULL, start, param);
     } else{
         _attr_t_static_init((pthread_attr_t_bionic *) attr);
-        pthread_attr_setstacksize(attr->real_ptr, 512 * 1024);
+        if (attr->stack_size > 0)
+            pthread_attr_setstacksize(attr->real_ptr, attr->stack_size);
         ret = pthread_create(thread, attr->real_ptr, start, param);
     }
+
+    if (ret != 0)
+        l_error("pthread_create failed: attr=%p stack_size=%u ret=%d", attr, attr ? (unsigned)attr->stack_size : 0, ret);
 
     return ret;
 }
@@ -346,6 +346,7 @@ int pthread_attr_setdetachstate_soloader(pthread_attr_t_bionic *attr, int state)
 int pthread_attr_setstacksize_soloader(pthread_attr_t_bionic *attr, size_t stacksize) {
     if (!attr) return -1;
     _attr_t_static_init(attr);
+    attr->stack_size = stacksize;
     return pthread_attr_setstacksize(attr->real_ptr, stacksize);
 }
 
