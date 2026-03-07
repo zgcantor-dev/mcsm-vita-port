@@ -25,19 +25,24 @@ extern so_module so_mod;
 
 
 static so_hook fmod_get_userdata_hook;
-static uintptr_t fmod_text_base;
+static uintptr_t fmod_system_get_userdata_addr;
 
-static void *get_fmod_userdata_iface_ptr(void) {
-    if (!fmod_text_base)
+#define FMOD_ERR_INTERNAL 28
+#define FMOD_ERR_INVALID_PARAM 31
+
+static void *get_fmod_globals_flags_ptr(void) {
+    if (!fmod_system_get_userdata_addr)
         return NULL;
 
-    // libfmod.so@0x000CD954
-    //   ldr r3, [pc, #0xec] ; [0x000CDA48]
-    //   ldr r3, [pc, r3]    ; [0x000CD968 + r3] -> global slot
-    //   ldr r3, [r3]        ; FMOD globals
-    //   ldr r0, [r3, #0x68] ; userdata iface (may be NULL during startup)
-    uint32_t got_off = *(uint32_t *)(fmod_text_base + 0x000CDA48);
-    void **global_slot = (void **)(fmod_text_base + 0x000CD968 + got_off);
+    // _ZN4FMOD6System11getUserDataEPPv:
+    //   +0x24: ldr r3, [pc, #0x78]   ; loads literal at +0xA4
+    //   +0x28: ldr r3, [pc, r3]       ; resolves GOT slot
+    //   +0x2C: ldr r3, [r3]           ; FMOD globals
+    //   +0x30: ldr r3, [r3, #0xC]     ; globals flags pointer
+    // We decode this sequence from the loaded image so we stay compatible
+    // with this libfmod build without hardcoding stale offsets.
+    uint32_t got_off = *(uint32_t *)(fmod_system_get_userdata_addr + 0xA4);
+    void **global_slot = (void **)(fmod_system_get_userdata_addr + 0x30 + got_off);
     if (!global_slot)
         return NULL;
 
@@ -49,23 +54,20 @@ static void *get_fmod_userdata_iface_ptr(void) {
     if (!globals)
         return NULL;
 
-    return *(void **)((uintptr_t)globals + 0x68);
+    return (void *)((uintptr_t)globals + 0xC);
 }
 
 static int fmod_get_userdata_patched(void *instance, void **userdata) {
     if (!instance || !userdata)
-        return 31;
+        return FMOD_ERR_INVALID_PARAM;
 
-    // libfmod.so@0x000CD978 does `ldr r3, [r0]` after loading r0 from
-    // the FMOD globals singleton at offset +0x68. Some startup paths call
-    // this entrypoint before that field is initialized, causing a null
-    // dereference data abort.
-    // Mirror the library's own failure path and return FMOD_ERR_INTERNAL (28)
-    // instead of letting it crash.
-    void *internal_iface = get_fmod_userdata_iface_ptr();
-    if (!internal_iface) {
+    // Guard FMOD global state used by getUserData before calling through.
+    // On some startup paths this chain is not initialized yet, and the
+    // original function crashes when dereferencing it.
+    void *flags_ptr = get_fmod_globals_flags_ptr();
+    if (!flags_ptr) {
         *userdata = NULL;
-        return 28;
+        return FMOD_ERR_INTERNAL;
     }
 
     return SO_CONTINUE(int, fmod_get_userdata_hook, instance, userdata);
@@ -75,11 +77,17 @@ void so_patch_fmod(so_module *mod) {
     if (!mod)
         return;
 
-    fmod_text_base = mod->text_base;
+    fmod_system_get_userdata_addr = so_symbol(mod, "_ZN4FMOD6System11getUserDataEPPv");
+    if (!fmod_system_get_userdata_addr)
+        fmod_system_get_userdata_addr = so_symbol(mod, "FMOD_System_GetUserData");
 
-    // JNI_OnLoad+0xA0C in libfmod.so: validates instance/userdata then dereferences instance.
-    // Guard null instance to avoid data abort at ldr r3, [r0].
-    fmod_get_userdata_hook = hook_addr(mod->text_base + 0x000CD940, (uintptr_t)&fmod_get_userdata_patched);
+    if (!fmod_system_get_userdata_addr) {
+        l_error("libfmod: unable to locate System::getUserData for patching");
+        return;
+    }
+
+    fmod_get_userdata_hook = hook_addr(fmod_system_get_userdata_addr, (uintptr_t)&fmod_get_userdata_patched);
+    l_info("libfmod: patched System::getUserData at 0x%08x", (unsigned)fmod_system_get_userdata_addr);
 }
 static so_hook begin_static_vertices_hook;
 static so_hook begin_static_indices_hook;
