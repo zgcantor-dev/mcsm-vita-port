@@ -377,11 +377,8 @@ static const char *find_telltale_obb_payload_relative_path(const char *src) {
             continue;
 
         marker += strlen(obb_markers[i]);
-        if (*marker == '/')
+        if (*marker == '/' && marker[1] != '\0')
             return marker + 1;
-
-        if (*marker == '\0')
-            return "";
     }
 
     return NULL;
@@ -395,11 +392,7 @@ static int remap_telltale_extracted_data_path(const char *src, char *dst, size_t
     if (!relative)
         return 0;
 
-    int written;
-    if (*relative == '\0')
-        written = snprintf(dst, dst_size, "%s", DATA_PATH);
-    else
-        written = snprintf(dst, dst_size, "%s%s", DATA_PATH, relative);
+    int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, relative);
 
     if (written <= 0 || (size_t)written >= dst_size)
         return 0;
