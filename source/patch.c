@@ -30,6 +30,17 @@ static int fmod_get_userdata_patched(void *instance, void **userdata) {
     if (!instance || !userdata)
         return 31;
 
+    // libfmod.so@0x000CD978 does `ldr r3, [r0]` after loading r0 from
+    // [instance + 0x68]. Some startup paths call this entrypoint before that
+    // internal pointer is initialized, causing a null dereference data abort.
+    // Mirror the library's own failure path and return FMOD_ERR_INTERNAL (28)
+    // instead of letting it crash.
+    void *internal_iface = *(void **)((uintptr_t)instance + 0x68);
+    if (!internal_iface) {
+        *userdata = NULL;
+        return 28;
+    }
+
     return SO_CONTINUE(int, fmod_get_userdata_hook, instance, userdata);
 }
 
