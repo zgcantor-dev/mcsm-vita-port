@@ -28,6 +28,8 @@ static so_hook fmod_get_userdata_hook;
 static uintptr_t fmod_system_get_userdata_addr;
 static so_hook fmod_memory_initialize_hook;
 static uintptr_t fmod_memory_initialize_addr;
+static so_hook fmod_stream_chunk_alloc_hook;
+static uintptr_t fmod_stream_chunk_alloc_addr;
 
 #define FMOD_ERR_INTERNAL 28
 #define FMOD_ERR_INVALID_PARAM 31
@@ -121,6 +123,27 @@ static int fmod_memory_initialize_patched(uintptr_t poolmem,
                        memtypeflags);
 }
 
+static void *fmod_stream_chunk_alloc_patched(void *stream,
+                                             void *chunk,
+                                             unsigned int size,
+                                             unsigned int flags,
+                                             unsigned int align,
+                                             unsigned char from_worker) {
+    if (!stream) {
+        l_warn("libfmod: blocked null stream chunk allocation request");
+        return NULL;
+    }
+
+    return SO_CONTINUE(void *,
+                       fmod_stream_chunk_alloc_hook,
+                       stream,
+                       chunk,
+                       size,
+                       flags,
+                       align,
+                       from_worker);
+}
+
 void so_patch_fmod(so_module *mod) {
     if (!mod)
         return;
@@ -145,6 +168,13 @@ void so_patch_fmod(so_module *mod) {
 
     fmod_memory_initialize_hook = hook_addr(fmod_memory_initialize_addr, (uintptr_t)&fmod_memory_initialize_patched);
     l_info("libfmod: patched FMOD_Memory_Initialize at 0x%08x", (unsigned)fmod_memory_initialize_addr);
+
+    // libfmod internal streaming allocator assumes a non-null stream object and
+    // dereferences stream + 0x35C immediately (0x0C8558), which crashes on Vita
+    // startup in some game paths before the stream object is fully initialized.
+    fmod_stream_chunk_alloc_addr = mod->text_base + 0x000C8550;
+    fmod_stream_chunk_alloc_hook = hook_addr(fmod_stream_chunk_alloc_addr, (uintptr_t)&fmod_stream_chunk_alloc_patched);
+    l_info("libfmod: patched stream allocator helper at 0x%08x", (unsigned)fmod_stream_chunk_alloc_addr);
 }
 static so_hook begin_static_vertices_hook;
 static so_hook begin_static_indices_hook;
