@@ -26,6 +26,8 @@ extern so_module so_mod;
 
 static so_hook fmod_get_userdata_hook;
 static uintptr_t fmod_system_get_userdata_addr;
+static so_hook fmod_memory_initialize_hook;
+static uintptr_t fmod_memory_initialize_addr;
 
 #define FMOD_ERR_INTERNAL 28
 #define FMOD_ERR_INVALID_PARAM 31
@@ -57,6 +59,22 @@ static void *get_fmod_globals_flags_ptr(void) {
     return (void *)((uintptr_t)globals + 0xC);
 }
 
+static void *get_fmod_globals_ptr(void) {
+    if (!fmod_system_get_userdata_addr)
+        return NULL;
+
+    uint32_t got_off = *(uint32_t *)(fmod_system_get_userdata_addr + 0xA4);
+    void **global_slot = (void **)(fmod_system_get_userdata_addr + 0x30 + got_off);
+    if (!global_slot)
+        return NULL;
+
+    void *globals_ref = *global_slot;
+    if (!globals_ref)
+        return NULL;
+
+    return *(void **)globals_ref;
+}
+
 static int fmod_get_userdata_patched(void *instance, void **userdata) {
     if (!instance || !userdata)
         return FMOD_ERR_INVALID_PARAM;
@@ -71,6 +89,36 @@ static int fmod_get_userdata_patched(void *instance, void **userdata) {
     }
 
     return SO_CONTINUE(int, fmod_get_userdata_hook, instance, userdata);
+}
+
+static int fmod_memory_initialize_patched(uintptr_t poolmem,
+                                          int poollen,
+                                          void *useralloc,
+                                          void *userrealloc,
+                                          void *userfree,
+                                          unsigned int memtypeflags) {
+    (void)poolmem;
+    (void)poollen;
+    (void)useralloc;
+    (void)userrealloc;
+    (void)userfree;
+    (void)memtypeflags;
+
+    void *globals = get_fmod_globals_ptr();
+    void *memory_state = globals ? *(void **)((uintptr_t)globals + 0x5C) : NULL;
+    if (!memory_state) {
+        l_warn("libfmod: blocked FMOD_Memory_Initialize before runtime globals are ready");
+        return FMOD_ERR_INTERNAL;
+    }
+
+    return SO_CONTINUE(int,
+                       fmod_memory_initialize_hook,
+                       poolmem,
+                       poollen,
+                       useralloc,
+                       userrealloc,
+                       userfree,
+                       memtypeflags);
 }
 
 void so_patch_fmod(so_module *mod) {
@@ -88,6 +136,15 @@ void so_patch_fmod(so_module *mod) {
 
     fmod_get_userdata_hook = hook_addr(fmod_system_get_userdata_addr, (uintptr_t)&fmod_get_userdata_patched);
     l_info("libfmod: patched System::getUserData at 0x%08x", (unsigned)fmod_system_get_userdata_addr);
+
+    fmod_memory_initialize_addr = so_symbol(mod, "FMOD_Memory_Initialize");
+    if (!fmod_memory_initialize_addr) {
+        l_error("libfmod: unable to locate FMOD_Memory_Initialize for patching");
+        return;
+    }
+
+    fmod_memory_initialize_hook = hook_addr(fmod_memory_initialize_addr, (uintptr_t)&fmod_memory_initialize_patched);
+    l_info("libfmod: patched FMOD_Memory_Initialize at 0x%08x", (unsigned)fmod_memory_initialize_addr);
 }
 static so_hook begin_static_vertices_hook;
 static so_hook begin_static_indices_hook;
