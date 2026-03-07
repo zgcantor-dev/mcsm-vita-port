@@ -13,11 +13,12 @@ static jobject jni_getObbFileName(jmethodID id, va_list args) {
 	(void)id;
 	(void)args;
 
-	// Some builds call getObbFileName() once for main and derive patch path.
-	// Others query for each file. Return main first, then patch, then keep
-	// returning patch so any repeated patch checks remain stable.
+	// Some builds call getObbFileName() once for main and derive patch path,
+	// while others request both main and patch every startup attempt.
+	// Alternate main/patch deterministically so repeated initialization loops
+	// always receive a valid pair in order.
 	static int call_count = 0;
-	const char *path = (call_count++ == 0) ? TELLTALE_MAIN_OBB_ANDROID_PATH : TELLTALE_PATCH_OBB_ANDROID_PATH;
+	const char *path = ((call_count++ & 1) == 0) ? TELLTALE_MAIN_OBB_ANDROID_PATH : TELLTALE_PATCH_OBB_ANDROID_PATH;
 	return jni->NewStringUTF(&jni, path);
 }
 
