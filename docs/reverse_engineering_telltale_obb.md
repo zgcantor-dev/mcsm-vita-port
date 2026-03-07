@@ -147,3 +147,64 @@ rg -n "\*UND\*|AAsset|open|fopen|read|lseek|stat|opendir|readdir|SDL_Android|JNI
 
 /root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=SDL_AndroidGetInternalStoragePath_REAL --disassemble-symbols=SDL_AndroidGetExternalStoragePath_REAL --disassemble-symbols=Android_JNI_FileOpen references/libSDL2.so
 ```
+
+## Deeper finding: direct OBB handling in `Platform_Android::RegisterGameDataDirectories`
+
+A targeted disassembly pass on `Platform_Android::RegisterGameDataDirectories` (`0x58eb44`) revealed explicit OBB-driven mounting flow in engine code.
+
+### Evidence from strings + code path
+
+`strings -t x` shows these literals in `libGameEngine.so`:
+
+- `f67420` — `Using main obb %s from Google Play`
+- `f67444` — `main obb %s does not exist.`
+- `f67460` — `patch obb %s does not exist.`
+- `f67480` — `Using patch obb %s from Google Play`
+
+The function at `0x58eb44` logs those messages, then executes archive-loading calls.
+
+### Reconstructed flow inside `RegisterGameDataDirectories`
+
+For **main OBB** branch:
+
+1. Log `Using main obb ...`.
+2. Build String from main OBB path.
+3. `DataStreamFactory::CreateFileStream(path, ...)`.
+4. `TTArchive::Load(stream)`.
+5. `ResourceDirectory_TTArchive(name, ttarchive)`.
+6. Insert resulting resource directory into `ResourceFramer` set.
+
+For **patch OBB** branch (parallel logic):
+
+1. Log `Using patch obb ...`.
+2. Build String from patch OBB path.
+3. `DataStreamFactory::CreateFileStream(path, ...)`.
+4. `TTArchive::Load(stream)`.
+5. `ResourceDirectory_TTArchive(name, ttarchive)`.
+6. Insert resulting resource directory into `ResourceFramer` set.
+
+There are also explicit missing-file log paths (`main obb ... does not exist`, `patch obb ... does not exist`) and fallback handling.
+
+### Implication for `so_loader`
+
+This strongly suggests that at least this engine build expects OBB containers to be usable as file streams in normal startup flow. Therefore, the current extracted-only remap strategy may be insufficient by itself in scenarios where this branch is taken.
+
+To support this engine behavior, `so_loader` likely needs one of:
+
+1. **Real OBB file presence + correct path remap** (so engine opens/mounts OBB directly), or
+2. **A compatibility layer that emulates OBB-as-stream behavior** expected by `TTArchive::Load` call sites.
+
+Given this discovery, full support should prioritize matching this `RegisterGameDataDirectories` flow first, then keep extracted-file fallback as secondary path.
+
+### Additional command snippets used
+
+```bash
+# locate OBB literals with addresses
+strings -a -n 4 -t x references/libGameEngine.so | grep -Ei 'obb|ttarch2|ResourceCreateConcreteArchiveLocation'
+
+# inspect OBB mounting function
+/root/.swiftly/bin/llvm-objdump -d --disassemble-symbols=_ZN16Platform_Android27RegisterGameDataDirectoriesEv references/libGameEngine.so
+
+# focused window around core main/patch OBB branches
+/root/.swiftly/bin/llvm-objdump -d --start-address=0x58ec6c --stop-address=0x58ef10 references/libGameEngine.so
+```
