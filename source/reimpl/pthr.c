@@ -170,6 +170,12 @@ PTHR_INLINE int _cond_t_static_init(pthread_cond_t_bionic * cond, const pthread_
 int pthread_create_soloader(pthread_t *thread, const pthread_attr_t_bionic *attr, void *(*start)(void *), void *param) {
     int ret;
 
+    l_info("pthread_create(start=%p, param=%p, attr=%p, stack_size=%u)",
+           start,
+           param,
+           attr,
+           attr ? (unsigned)attr->stack_size : 0);
+
     if (!attr) {
         ret = pthread_create(thread, NULL, start, param);
     } else{
@@ -180,7 +186,9 @@ int pthread_create_soloader(pthread_t *thread, const pthread_attr_t_bionic *attr
     }
 
     if (ret != 0)
-        l_error("pthread_create failed: attr=%p stack_size=%u ret=%d", attr, attr ? (unsigned)attr->stack_size : 0, ret);
+        l_error("pthread_create failed: attr=%p stack_size=%u start=%p ret=%d", attr, attr ? (unsigned)attr->stack_size : 0, start, ret);
+    else
+        l_info("pthread_create success: start=%p thread=%p", start, thread ? (void *)*thread : NULL);
 
     return ret;
 }
@@ -437,16 +445,28 @@ int sem_post_soloader (int * uid) {
 }
 
 int sem_timedwait_soloader (int * uid, const struct timespec * abstime) {
+    if (!uid) {
+        l_error("sem_timedwait(NULL, %p)", abstime);
+        return -1;
+    }
+
+    l_debug("sem_timedwait(begin uid=%d, abstime=%p)", *uid, abstime);
     uint timeout = 1000;
-    if (sceKernelWaitSema(*uid, 1, &timeout) >= 0)
+    if (sceKernelWaitSema(*uid, 1, &timeout) >= 0) {
+        l_debug("sem_timedwait(end uid=%d) immediate success", *uid);
         return 0;
+    }
     if (!abstime) return -1;
     long long now = (long long) current_timestamp_ms() * 1000; // us
     long long _timeout = abstime->tv_sec * 1000 * 1000 + abstime->tv_nsec / 1000; // us
-    if (_timeout-now >= 0) return -1;
+    if (_timeout - now <= 0) return -1;
     uint timeout_real = _timeout - now;
-    if (sceKernelWaitSema(*uid, 1, &timeout_real) < 0)
+    if (sceKernelWaitSema(*uid, 1, &timeout_real) < 0) {
+        l_warn("sem_timedwait(end uid=%d) timed out/failed", *uid);
         return -1;
+    }
+
+    l_debug("sem_timedwait(end uid=%d) success", *uid);
     return 0;
 }
 
@@ -458,7 +478,28 @@ int sem_trywait_soloader (int * uid) {
 }
 
 int sem_wait_soloader (int * uid) {
-    if (sceKernelWaitSema(*uid, 1, NULL) < 0)
+    if (!uid) {
+        l_error("sem_wait(NULL)");
         return -1;
+    }
+
+    l_debug("sem_wait(begin uid=%d)", *uid);
+    int ret = sceKernelWaitSema(*uid, 1, NULL);
+    if (ret < 0) {
+        l_error("sem_wait(end uid=%d) failed: 0x%x", *uid, ret);
+        return -1;
+    }
+
+    l_debug("sem_wait(end uid=%d) success", *uid);
     return 0;
+}
+
+int sem_close_soloader(int *uid) {
+    if (!uid) {
+        l_error("sem_close(NULL)");
+        return -1;
+    }
+
+    l_debug("sem_close(uid=%d): forwarding to sem_destroy", *uid);
+    return sem_destroy_soloader(uid);
 }

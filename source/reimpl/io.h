@@ -20,6 +20,7 @@ extern "C" {
 #endif
 
 #include <stdio.h>
+#include <stdint.h>
 #include <sys/dirent.h>
 #include <sys/syslimits.h>
 #include <sys/fcntl.h>
@@ -59,6 +60,23 @@ typedef struct __attribute__((__packed__)) stat64_bionic {
     unsigned long long st_ino;
 } stat64_bionic;
 
+
+typedef struct __attribute__((__packed__)) statfs_bionic {
+    uint32_t f_type;
+    uint32_t f_bsize;
+    uint64_t f_blocks;
+    uint64_t f_bfree;
+    uint64_t f_bavail;
+    uint64_t f_files;
+    uint64_t f_ffree;
+    uint32_t f_fsid_0;
+    uint32_t f_fsid_1;
+    uint32_t f_namelen;
+    uint32_t f_frsize;
+    uint32_t f_flags;
+    uint32_t f_spare[4];
+} statfs_bionic;
+
 typedef struct __attribute__((__packed__)) dirent64_bionic {
     int16_t d_ino; // 2 bytes // offset 0x0
     int64_t d_off; // 8 bytes // offset 0x2
@@ -74,6 +92,8 @@ FILE * fopen_soloader(const char * filename, const char * mode);
 DIR *opendir_soloader(char *name);
 
 int stat_soloader(const char * path, stat64_bionic * buf);
+
+int statfs_soloader(const char *path, statfs_bionic *buf);
 
 int fstat_soloader(int fd, stat64_bionic * buf);
 

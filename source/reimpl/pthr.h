@@ -90,6 +90,7 @@ int sem_post_soloader(int *sem);
 int sem_timedwait_soloader(int *sem, const struct timespec *abstime);
 int sem_trywait_soloader(int *sem);
 int sem_wait_soloader(int *sem);
+int sem_close_soloader(int *sem);
 
 #ifdef __cplusplus
 };

@@ -11,6 +11,7 @@
 
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/unistd.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -532,6 +533,56 @@ int fstat_soloader(int fd, stat64_bionic * buf) {
 
     l_debug("fstat(%i): %i", fd, res);
     return res;
+}
+
+
+int statfs_soloader(const char *path, statfs_bionic *buf) {
+    if (!path || !buf) {
+        l_warn("statfs(%p, %p): invalid arguments", path, buf);
+        return -1;
+    }
+
+    const char *resolved_path = path;
+    char remapped_path[PATH_MAX];
+    char fallback_path[PATH_MAX];
+
+    if (remap_android_storage_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
+    } else if (remap_telltale_extracted_data_path(path, remapped_path, sizeof(remapped_path))) {
+        resolved_path = remapped_path;
+    } else if (remap_telltale_obb_path(path, remapped_path, sizeof(remapped_path))) {
+        struct statvfs stvfs_obb;
+        int res_obb = statvfs(remapped_path, &stvfs_obb);
+        if (res_obb != 0 && remap_telltale_obb_data_path(path, fallback_path, sizeof(fallback_path))) {
+            resolved_path = fallback_path;
+        } else {
+            resolved_path = remapped_path;
+        }
+    }
+
+    struct statvfs stvfs;
+    int res = statvfs(resolved_path, &stvfs);
+    if (res != 0) {
+        l_warn("statfs(%s => %s): %i", path, resolved_path, res);
+        return res;
+    }
+
+    memset(buf, 0, sizeof(*buf));
+    buf->f_type = 0;
+    buf->f_bsize = (uint32_t)stvfs.f_bsize;
+    buf->f_blocks = (uint64_t)stvfs.f_blocks;
+    buf->f_bfree = (uint64_t)stvfs.f_bfree;
+    buf->f_bavail = (uint64_t)stvfs.f_bavail;
+    buf->f_files = (uint64_t)stvfs.f_files;
+    buf->f_ffree = (uint64_t)stvfs.f_ffree;
+    buf->f_fsid_0 = 0;
+    buf->f_fsid_1 = 0;
+    buf->f_namelen = (uint32_t)stvfs.f_namemax;
+    buf->f_frsize = (uint32_t)stvfs.f_frsize;
+    buf->f_flags = (uint32_t)stvfs.f_flag;
+
+    l_debug("statfs(%s => %s): 0", path, resolved_path);
+    return 0;
 }
 
 int stat_soloader(const char * path, stat64_bionic * buf) {

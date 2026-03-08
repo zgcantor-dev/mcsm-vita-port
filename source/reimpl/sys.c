@@ -17,6 +17,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/rtc.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "utils/utils.h"
 #include "utils/logger.h"
@@ -113,6 +114,11 @@ void abort_soloader() {
 void exit_soloader(int status) {
     l_fatal("Exit(%i) called from %p", status, __builtin_return_address(0));
     exit(status);
+}
+
+void _exit_soloader(int status) {
+    l_fatal("_exit(%i) called from %p", status, __builtin_return_address(0));
+    _exit(status);
 }
 
 int __atomic_dec(volatile int *ptr) {

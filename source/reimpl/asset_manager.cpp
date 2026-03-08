@@ -69,6 +69,15 @@ AAssetManager *AAssetManager_fromJava(void *env, void *assetManager) {
     return mgr;
 }
 
+
+static std::string normalize_asset_relative_path(const char *filename) {
+    std::string requested = filename ? filename : "";
+    while (!requested.empty() && requested[0] == '/') {
+        requested.erase(0, 1);
+    }
+    return requested;
+}
+
 static FILE *open_asset_path(const char *path) {
 #ifdef USE_SCELIBC_IO
     return sceLibcBridge_fopen(path, "rb");
@@ -83,7 +92,7 @@ AAsset* AAssetManager_open(AAssetManager* mgr, const char* filename, int mode) {
         return nullptr;
     }
 
-    std::string requested(filename);
+    std::string requested = normalize_asset_relative_path(filename);
     std::string data_root = std::string(DATA_PATH);
     std::string assets_path = data_root + std::string("assets/") + requested;
     std::string direct_path = data_root + requested;
@@ -228,7 +237,7 @@ AAssetDir* AAssetManager_openDir(AAssetManager* mgr, const char* dirName) {
         return nullptr;
     }
 
-    std::string requested(dirName);
+    std::string requested = normalize_asset_relative_path(dirName);
     std::string dataRoot(DATA_PATH);
     std::string baseAssets = dataRoot + "assets";
     std::string baseDirect = dataRoot;

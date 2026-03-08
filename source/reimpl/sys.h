@@ -41,6 +41,8 @@ void abort_soloader();
 
 void exit_soloader(int status);
 
+void _exit_soloader(int status);
+
 int __atomic_dec(volatile int *ptr);
 
 int __atomic_inc(volatile int *ptr);
