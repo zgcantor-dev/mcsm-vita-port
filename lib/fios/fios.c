@@ -8,6 +8,7 @@
  */
 
 #include <malloc.h>
+#include <string.h>
 
 #include "fios.h"
 
@@ -27,6 +28,9 @@ int fios_init(const char * path) {
     int res;
 
     SceFiosParams params = SCE_FIOS_PARAMS_INITIALIZER;
+    memset(&params, 0, sizeof(params));
+    params = (SceFiosParams)SCE_FIOS_PARAMS_INITIALIZER;
+
     params.opStorage.pPtr = g_OpStorage;
     params.opStorage.length = sizeof(g_OpStorage);
     params.chunkStorage.pPtr = g_ChunkStorage;
@@ -53,6 +57,7 @@ int fios_init(const char * path) {
     if (!g_RamCacheWorkBuffer)
         return -1;
 
+    memset(&g_RamCacheContext, 0, sizeof(g_RamCacheContext));
     g_RamCacheContext.pPath = path;
     g_RamCacheContext.pWorkBuffer = g_RamCacheWorkBuffer;
     g_RamCacheContext.workBufferSize = RAMCACHEBLOCKNUM * RAMCACHEBLOCKSIZE;

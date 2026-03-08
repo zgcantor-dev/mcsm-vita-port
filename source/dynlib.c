@@ -450,6 +450,7 @@ so_default_dynlib default_dynlib[] = {
         { "readdir", (uintptr_t)&readdir_soloader },
         { "readdir_r", (uintptr_t)&readdir_r_soloader },
         { "stat", (uintptr_t)&stat_soloader },
+        { "statfs", (uintptr_t)&statfs_soloader },
         { "utime", (uintptr_t)&utime },
 
         #ifdef USE_SCELIBC_IO
@@ -592,6 +593,7 @@ so_default_dynlib default_dynlib[] = {
         { "glAttachShader", (uintptr_t)&glAttachShader },
         { "glBindAttribLocation", (uintptr_t)&glBindAttribLocation },
         { "glBindBuffer", (uintptr_t)&glBindBuffer_soloader },
+        { "glBindBufferOES", (uintptr_t)&glBindBuffer_soloader },
         { "glBindFramebuffer", (uintptr_t)&glBindFramebuffer },
         { "glBindFramebufferOES", (uintptr_t)&glBindFramebuffer },
         { "glBindRenderbuffer", (uintptr_t)&glBindRenderbuffer },
@@ -606,6 +608,7 @@ so_default_dynlib default_dynlib[] = {
         { "glBlendFuncSeparate", (uintptr_t)&glBlendFuncSeparate },
         { "glBlendFuncSeparateOES", (uintptr_t)&glBlendFuncSeparate },
         { "glBufferData", (uintptr_t)&glBufferData_soloader },
+        { "glBufferDataOES", (uintptr_t)&glBufferData_soloader },
         { "glBufferSubData", (uintptr_t)&glBufferSubData },
         { "glCheckFramebufferStatus", (uintptr_t)&glCheckFramebufferStatus },
         { "glCheckFramebufferStatusOES", (uintptr_t)&glCheckFramebufferStatus },
@@ -689,6 +692,7 @@ so_default_dynlib default_dynlib[] = {
         { "glGetAttribLocation", (uintptr_t)&glGetAttribLocation },
         { "glGetBooleanv", (uintptr_t)&glGetBooleanv },
         { "glGetBufferParameteriv", (uintptr_t)&glGetBufferParameteriv },
+        { "glGetBufferParameterivOES", (uintptr_t)&glGetBufferParameteriv },
         { "glGetBufferPointervOES", (uintptr_t)&ret0 },
         { "glGetClipPlanef", (uintptr_t)&ret0 },
         { "glGetClipPlanex", (uintptr_t)&ret0 },
@@ -897,6 +901,7 @@ so_default_dynlib default_dynlib[] = {
         { "pthread_setspecific", (uintptr_t)&pthread_setspecific },
         { "pthread_sigmask", (uintptr_t)&ret0 },
 
+        { "sem_close", (uintptr_t) &sem_close_soloader },
         { "sem_destroy", (uintptr_t) &sem_destroy_soloader },
         { "sem_getvalue", (uintptr_t) &sem_getvalue_soloader },
         { "sem_init", (uintptr_t) &sem_init_soloader },
@@ -1052,6 +1057,7 @@ so_default_dynlib default_dynlib[] = {
         { "atoll", (uintptr_t)&atoll },
         { "bsearch", (uintptr_t)&bsearch },
         { "exit", (uintptr_t)&exit_soloader },
+        { "_exit", (uintptr_t)&_exit_soloader },
         { "lrand48", (uintptr_t)&lrand48 },
         { "prctl", (uintptr_t)&ret0 },
         { "sleep", (uintptr_t)&sleep },
