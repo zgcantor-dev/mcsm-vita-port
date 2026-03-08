@@ -33,6 +33,7 @@ static uintptr_t fmod_stream_chunk_alloc_addr;
 static so_hook fmod_system_validate_hook;
 static uintptr_t fmod_system_validate_addr;
 
+#define FMOD_OK 0
 #define FMOD_ERR_INTERNAL 28
 #define FMOD_ERR_INVALID_PARAM 31
 #define FMOD_ERR_MEMORY 38
@@ -89,8 +90,9 @@ static int fmod_get_userdata_patched(void *instance, void **userdata) {
     // original function crashes when dereferencing it.
     void *flags_ptr = get_fmod_globals_flags_ptr();
     if (!flags_ptr) {
+        l_warn("libfmod: getUserData global flags not ready yet; returning NULL userdata");
         *userdata = NULL;
-        return FMOD_ERR_INTERNAL;
+        return FMOD_OK;
     }
 
     return SO_CONTINUE(int, fmod_get_userdata_hook, instance, userdata);
@@ -112,8 +114,11 @@ static int fmod_memory_initialize_patched(uintptr_t poolmem,
     void *globals = get_fmod_globals_ptr();
     void *memory_state = globals ? *(void **)((uintptr_t)globals + 0x5C) : NULL;
     if (!memory_state) {
-        l_warn("libfmod: blocked FMOD_Memory_Initialize before runtime globals are ready");
-        return FMOD_ERR_INTERNAL;
+        // Returning an internal error here can trap callers in retry loops during
+        // boot and stall worker/audio startup. Treat this as a deferred no-op
+        // and let FMOD continue to initialize through later calls.
+        l_warn("libfmod: deferring FMOD_Memory_Initialize until runtime globals are ready");
+        return FMOD_OK;
     }
 
     return SO_CONTINUE(int,

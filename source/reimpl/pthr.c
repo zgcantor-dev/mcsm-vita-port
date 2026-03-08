@@ -12,6 +12,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sched.h>
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/threadmgr.h>
 #include <stdatomic.h>
@@ -392,8 +393,34 @@ pthread_t pthread_self_soloader()
 int pthread_once_soloader(volatile int *once_control, void (*init_routine)(void)) {
     if (!once_control || !init_routine)
         return -1;
-    if (__sync_lock_test_and_set(once_control, 1) == 0)
-        (*init_routine)();
+
+    // Bionic pthread_once state machine is 0 (never), 1 (initializing), 2 (done).
+    // The previous implementation returned immediately for threads that observed
+    // state 1, allowing consumers to race against partially initialized globals.
+    // That race can deadlock startup worker threads (notably FMOD/audio paths).
+    for (;;) {
+        int state = __atomic_load_n(once_control, __ATOMIC_ACQUIRE);
+        if (state == 2)
+            return 0;
+
+        if (state == 0) {
+            int expected = 0;
+            if (__atomic_compare_exchange_n(once_control,
+                                            &expected,
+                                            1,
+                                            0,
+                                            __ATOMIC_ACQ_REL,
+                                            __ATOMIC_ACQUIRE)) {
+                (*init_routine)();
+                __atomic_store_n(once_control, 2, __ATOMIC_RELEASE);
+                return 0;
+            }
+            continue;
+        }
+
+        sched_yield();
+    }
+
     return 0;
 }
 
@@ -405,9 +432,17 @@ int pthread_setname_np_soloader(pthread_t thread, const char* thread_name) {
     if (thread == 0 || thread_name == NULL) {
         return EINVAL;
     }
+
     size_t thread_name_len = strlen(thread_name);
     if (thread_name_len >= MAX_TASK_COMM_LEN) {
-        return ERANGE;
+        char truncated_name[MAX_TASK_COMM_LEN];
+        sceClibMemcpy(truncated_name, thread_name, MAX_TASK_COMM_LEN - 1);
+        truncated_name[MAX_TASK_COMM_LEN - 1] = '\0';
+        _log_printf("PTHREAD: pthread_setname_np truncated %s -> %s for thread:0x%x\n",
+                    thread_name,
+                    truncated_name,
+                    pthread_self());
+        return 0;
     }
 
     _log_printf("PTHREAD: pthread_setname_np with name %s for thread:0x%x\n", thread_name, pthread_self());
