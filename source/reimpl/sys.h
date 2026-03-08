@@ -63,6 +63,9 @@ int sigsetjmp_soloader(jmp_buf env, int savesigs);
 void siglongjmp_soloader(jmp_buf env, int value);
 
 unsigned int alarm_soloader(unsigned int seconds);
+uid_t getuid_soloader(void);
+gid_t getgid_soloader(void);
+gid_t getegid_soloader(void);
 uid_t geteuid_soloader(void);
 struct passwd *getpwuid_soloader(uid_t uid);
 int gethostbyname_r_soloader(const char *name,

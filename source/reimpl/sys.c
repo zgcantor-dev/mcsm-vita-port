@@ -173,8 +173,20 @@ unsigned int alarm_soloader(unsigned int seconds) {
     return 0;
 }
 
+uid_t getuid_soloader(void) {
+    return 1000;
+}
+
+gid_t getgid_soloader(void) {
+    return 1000;
+}
+
+gid_t getegid_soloader(void) {
+    return 1000;
+}
+
 uid_t geteuid_soloader(void) {
-    return getuid();
+    return 1000;
 }
 
 struct passwd *getpwuid_soloader(uid_t uid) {

@@ -1017,8 +1017,11 @@ so_default_dynlib default_dynlib[] = {
 
         // Syscalls
         { "fork", (uintptr_t)&fork },
+        { "getegid", (uintptr_t)&getegid_soloader },
         { "geteuid", (uintptr_t)&geteuid_soloader },
+        { "getgid", (uintptr_t)&getgid_soloader },
         { "getpagesize", (uintptr_t)&getpagesize },
+        { "getuid", (uintptr_t)&getuid_soloader },
         { "getpid", (uintptr_t)&getpid },
         { "getpwuid", (uintptr_t)&getpwuid_soloader },
         { "sbrk", (uintptr_t)&sbrk },
