@@ -1,6 +1,7 @@
 #include <falso_jni/FalsoJNI.h>
 #include <falso_jni/FalsoJNI_Impl.h>
 #include <falso_jni/FalsoJNI_Logger.h>
+#include <string.h>
 
 #define TELLTALE_PKG_NAME "com.telltalegames.minecraft100"
 #define TELLTALE_OBB_VERSION "40137"
@@ -46,6 +47,87 @@ static jobject jni_getExternalStorageDirs(jmethodID id, va_list args) {
 	return dirs;
 }
 
+static jobject jni_getHardwareModel(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "PlayStation Vita");
+}
+
+static jboolean jni_hasFeature(jmethodID id, va_list args) {
+	(void)id;
+	jstring feature_jstr = va_arg(args, jstring);
+
+	if (!feature_jstr)
+		return JNI_FALSE;
+
+	const char *feature = jni->GetStringUTFChars(&jni, feature_jstr, NULL);
+	if (!feature)
+		return JNI_FALSE;
+
+	// Conservative defaults so the Android game path doesn't assume unsupported
+	// platform capabilities on Vita.
+	jboolean supported = JNI_FALSE;
+	if (strcmp(feature, "android.hardware.touchscreen") == 0)
+		supported = JNI_TRUE;
+
+	jni->ReleaseStringUTFChars(&jni, feature_jstr, feature);
+	return supported;
+}
+
+static void jni_setFramebufferSize(jmethodID id, va_list args) {
+	(void)id;
+	(void)va_arg(args, int);
+	(void)va_arg(args, int);
+}
+
+static jint jni_getSampleRate(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return 48000;
+}
+
+static jint jni_getOutputFramesPerBuffer(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return 1024;
+}
+
+static jboolean jni_isUsingBluetooth(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return JNI_FALSE;
+}
+
+static jobject jni_getHardwareDisplay(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "qHD");
+}
+
+static jobject jni_getHardwareManufacturer(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "Sony");
+}
+
+static jobject jni_getLocale(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "en_US");
+}
+
+static jobject jni_getHardwareOS(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "PlayStation Vita");
+}
+
+static jobject jni_getHardwareBoard(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return jni->NewStringUTF(&jni, "PCH-1000");
+}
+
 /*
  * JNI Methods
 */
@@ -54,22 +136,47 @@ NameToMethodID nameToMethodId[] = {
 		{ 100, "getObbFileName", METHOD_TYPE_OBJECT },
 		{ 101, "getExternalStorageDirectory", METHOD_TYPE_OBJECT },
 		{ 102, "getExternalStorageDirs", METHOD_TYPE_OBJECT },
+		{ 103, "getHardwareModel", METHOD_TYPE_OBJECT },
+		{ 104, "hasFeature", METHOD_TYPE_BOOLEAN },
+		{ 105, "setFramebufferSize", METHOD_TYPE_VOID },
+		{ 106, "getSampleRate", METHOD_TYPE_INT },
+		{ 107, "getOutputFramesPerBuffer", METHOD_TYPE_INT },
+		{ 108, "isUsingBluetooth", METHOD_TYPE_BOOLEAN },
+		{ 109, "getHardwareDisplay", METHOD_TYPE_OBJECT },
+		{ 110, "getHardwareManufacturer", METHOD_TYPE_OBJECT },
+		{ 111, "getLocale", METHOD_TYPE_OBJECT },
+		{ 112, "getHardwareOS", METHOD_TYPE_OBJECT },
+		{ 113, "getHardwareBoard", METHOD_TYPE_OBJECT },
 };
 
-MethodsBoolean methodsBoolean[] = {};
+MethodsBoolean methodsBoolean[] = {
+		{ 104, jni_hasFeature },
+		{ 108, jni_isUsingBluetooth },
+};
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};
 MethodsDouble methodsDouble[] = {};
 MethodsFloat methodsFloat[] = {};
-MethodsInt methodsInt[] = {};
+MethodsInt methodsInt[] = {
+		{ 106, jni_getSampleRate },
+		{ 107, jni_getOutputFramesPerBuffer },
+};
 MethodsLong methodsLong[] = {};
 MethodsObject methodsObject[] = {
 		{ 100, jni_getObbFileName },
 		{ 101, jni_getExternalStorageDirectory },
 		{ 102, jni_getExternalStorageDirs },
+		{ 103, jni_getHardwareModel },
+		{ 109, jni_getHardwareDisplay },
+		{ 110, jni_getHardwareManufacturer },
+		{ 111, jni_getLocale },
+		{ 112, jni_getHardwareOS },
+		{ 113, jni_getHardwareBoard },
 };
 MethodsShort methodsShort[] = {};
-MethodsVoid methodsVoid[] = {};
+MethodsVoid methodsVoid[] = {
+		{ 105, jni_setFramebufferSize },
+};
 
 /*
  * JNI Fields
