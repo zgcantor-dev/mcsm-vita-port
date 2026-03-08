@@ -362,6 +362,7 @@ so_default_dynlib default_dynlib[] = {
         { "lround", (uintptr_t)&lround },
         { "lroundf", (uintptr_t)&lroundf },
         { "modf", (uintptr_t)&modf },
+        { "modff", (uintptr_t)&modff },
         { "pow", (uintptr_t)&pow },
         { "powf", (uintptr_t)&powf },
         { "rint", (uintptr_t)&rint },
@@ -381,6 +382,8 @@ so_default_dynlib default_dynlib[] = {
         { "tan", (uintptr_t)&tan },
         { "tanf", (uintptr_t)&tanf },
         { "tanh", (uintptr_t)&tanh },
+        { "tanhf", (uintptr_t)&tanhf },
+        { "coshf", (uintptr_t)&coshf },
         { "trunc", (uintptr_t)&trunc },
         { "truncf", (uintptr_t)&truncf },
 
@@ -394,6 +397,7 @@ so_default_dynlib default_dynlib[] = {
         { "getaddrinfo", (uintptr_t)&getaddrinfo },
         { "gethostbyaddr", (uintptr_t)&gethostbyaddr },
         { "gethostbyname", (uintptr_t)&gethostbyname },
+        { "gethostbyname_r", (uintptr_t)&gethostbyname_r_soloader },
         { "gethostname", (uintptr_t)&gethostname },
         { "getpeername", (uintptr_t)&getpeername },
         { "getservbyname", (uintptr_t)&getservbyname },
@@ -1013,8 +1017,10 @@ so_default_dynlib default_dynlib[] = {
 
         // Syscalls
         { "fork", (uintptr_t)&fork },
+        { "geteuid", (uintptr_t)&geteuid_soloader },
         { "getpagesize", (uintptr_t)&getpagesize },
         { "getpid", (uintptr_t)&getpid },
+        { "getpwuid", (uintptr_t)&getpwuid_soloader },
         { "sbrk", (uintptr_t)&sbrk },
         { "syscall", (uintptr_t)&syscall },
         { "sysconf", (uintptr_t)&ret0 },
@@ -1026,6 +1032,7 @@ so_default_dynlib default_dynlib[] = {
         { "clock", (uintptr_t)&clock_soloader },
         { "clock_getres", (uintptr_t)&clock_getres_soloader },
         { "clock_gettime", (uintptr_t)&clock_gettime_soloader },
+        { "asctime", (uintptr_t)&asctime },
         { "difftime", (uintptr_t)&difftime },
         { "gettimeofday", (uintptr_t)&gettimeofday },
         { "gmtime", (uintptr_t)&gmtime },
@@ -1097,7 +1104,10 @@ so_default_dynlib default_dynlib[] = {
         // Signals
         { "bsd_signal", (uintptr_t)&signal },
         { "raise", (uintptr_t)&raise },
+        { "siglongjmp", (uintptr_t)&siglongjmp_soloader },
         { "sigaction", (uintptr_t)&sigaction },
+        { "sigsetjmp", (uintptr_t)&sigsetjmp_soloader },
+        { "alarm", (uintptr_t)&alarm_soloader },
 
 
         // Locale

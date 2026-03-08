@@ -18,6 +18,9 @@
 #include <psp2/rtc.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <netdb.h>
+#include <pwd.h>
+#include <setjmp.h>
 
 #include "utils/utils.h"
 #include "utils/logger.h"
@@ -150,6 +153,48 @@ char * getenv_soloader(const char * var) {
 int setenv_soloader(const char * name, const char * value, int overwrite) {
     l_warn("setenv(\"%s\", \"%s\"): not implemented.", name, value);
     return 0;
+}
+
+int sigsetjmp_soloader(jmp_buf env, int savesigs) {
+    (void)savesigs;
+    return setjmp(env);
+}
+
+void siglongjmp_soloader(jmp_buf env, int value) {
+    longjmp(env, value);
+}
+
+unsigned int alarm_soloader(unsigned int seconds) {
+    l_warn("alarm(%u): not implemented", seconds);
+    return 0;
+}
+
+uid_t geteuid_soloader(void) {
+    return getuid();
+}
+
+struct passwd *getpwuid_soloader(uid_t uid) {
+    (void)uid;
+    return NULL;
+}
+
+int gethostbyname_r_soloader(const char *name,
+                             struct hostent *ret,
+                             char *buf,
+                             size_t buflen,
+                             struct hostent **result,
+                             int *h_errnop) {
+    (void)name;
+    (void)ret;
+    (void)buf;
+    (void)buflen;
+
+    if (result)
+        *result = NULL;
+    if (h_errnop)
+        *h_errnop = HOST_NOT_FOUND;
+
+    return -1;
 }
 
 int getpagesize(void) {
