@@ -277,7 +277,7 @@ so_default_dynlib default_dynlib[] = {
         { "SDL_JoystickUpdate", (uintptr_t)&SDL_JoystickUpdate },
         { "SDL_Log", (uintptr_t)&SDL_Log },
         { "SDL_NumJoysticks", (uintptr_t)&SDL_NumJoysticks },
-        { "SDL_PollEvent", (uintptr_t)&SDL_PollEvent },
+        { "SDL_PollEvent", (uintptr_t)&SDL_PollEvent_filtered },
         { "SDL_PushEvent", (uintptr_t)&SDL_PushEvent },
         { "SDL_Quit", (uintptr_t)&SDL_Quit },
         { "SDL_SetHint", (uintptr_t)&SDL_SetHint },

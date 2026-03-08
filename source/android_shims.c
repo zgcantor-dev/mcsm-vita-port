@@ -19,6 +19,24 @@
 #endif
 
 #ifdef USE_SDL2
+int SDL_PollEvent_filtered(SDL_Event *event) {
+    int ret;
+
+    while ((ret = SDL_PollEvent(event)) == 1) {
+        if (!event)
+            return ret;
+
+        // Vita SDL2 can emit frequent system-window-manager events (0x802 / 2050)
+        // that are not handled by the Android game event loop and spam logs.
+        if (event->type == SDL_SYSWMEVENT)
+            continue;
+
+        return ret;
+    }
+
+    return ret;
+}
+
 SDL_Window *SDL_CreateWindow_logged(const char *title, int x, int y,
                                            int w, int h, Uint32 flags) {
     SDL_Window *window = SDL_CreateWindow(title, x, y, w, h, flags);
