@@ -11,8 +11,6 @@
 #include "utils/logger.h"
 #include "utils/utils.h"
 
-extern so_module so_mod;
-
 #ifndef ENGINE_ENTRYPOINT
 #define ENGINE_ENTRYPOINT "EngineMain"
 #endif
@@ -33,9 +31,13 @@ static void sdl_log_sink_noop(void *userdata, int category, SDL_LogPriority prio
     (void)message;
 }
 
-int start_engine_via_libGameEngine(void) {
-    so_module *engine = &so_mod;
+int start_engine_via_module(so_module *engine, const char *tag) {
+    if (!engine) {
+        l_error("[BOOT] %s: null engine module", tag ? tag : "(unknown)");
+        return -1;
+    }
 
+    const char *label = tag ? tag : "engine";
     const char *data_root = android_shims_get_data_root();
     _log_printf("[BOOT] data_root=%s\n", data_root ? data_root : "(null)");
 
@@ -52,9 +54,9 @@ int start_engine_via_libGameEngine(void) {
     typedef int (*SDLMainFn)(int, char **);
     SDLMainFn sdl_main = (SDLMainFn)so_symbol(engine, "SDL_main");
     if (sdl_main) {
-        _log_printf("[BOOT] calling SDL_main from engine\n");
+        _log_printf("[BOOT] %s: calling SDL_main\n", label);
         int ret = sdl_main(argc, argv);
-        _log_printf("[BOOT] SDL_main returned %d\n", ret);
+        _log_printf("[BOOT] %s: SDL_main returned %d\n", label, ret);
         free(argv0);
         return ret;
     }
@@ -73,14 +75,14 @@ int start_engine_via_libGameEngine(void) {
         if (!fn)
             continue;
 
-        _log_printf("[BOOT] calling engine entry: %s @ %p\n", entry_candidates[i], fn);
+        _log_printf("[BOOT] %s: calling engine entry: %s @ %p\n", label, entry_candidates[i], fn);
         ((void (*)(void))fn)();
-        _log_printf("[BOOT] engine entry returned\n");
+        _log_printf("[BOOT] %s: engine entry returned\n", label);
         free(argv0);
         return 0;
     }
 
-    l_warn("ENGINE_OK_CONSTRUCTORS_DONE (no entrypoint found)");
+    l_warn("[BOOT] %s: constructors done but no entrypoint found", label);
     _log_printf("ENGINE_OK_CONSTRUCTORS_DONE\n");
     free(argv0);
     return 0;
