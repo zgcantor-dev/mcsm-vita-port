@@ -25,11 +25,22 @@ static char *sdl_strdup_local(const char *src) {
     return dst;
 }
 
+static void sdl_log_sink_noop(void *userdata, int category, SDL_LogPriority priority,
+                              const char *message) {
+    (void)userdata;
+    (void)category;
+    (void)priority;
+    (void)message;
+}
+
 int start_engine_via_libGameEngine(void) {
     so_module *engine = &so_mod;
 
     const char *data_root = android_shims_get_data_root();
     _log_printf("[BOOT] data_root=%s\n", data_root ? data_root : "(null)");
+
+    // Avoid PSVita SDL backend default log file output (ux0:/data/SDL_Log.txt).
+    SDL_LogSetOutputFunction(sdl_log_sink_noop, NULL);
 
     SDL_Android_Init();
     SDL_SetMainReady_REAL();
