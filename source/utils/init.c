@@ -47,9 +47,8 @@ static so_module fmod_mod;
 #ifdef LOAD_FMODSTUDIO
 static so_module fmodstudio_mod;
 #endif
-#ifdef LOAD_MAIN_SO_FOR_TRACE
 static so_module main_trace_mod;
-#endif
+static int main_trace_loaded;
 
 static void load_so_or_fail(so_module *mod, const char *path, const char *name, uintptr_t load_address) {
     if (!file_exists(path)) {
@@ -187,10 +186,14 @@ void soloader_init_all() {
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
 #endif
-#ifdef LOAD_MAIN_SO_FOR_TRACE
-    load_so_or_fail(&main_trace_mod, SO_PATH, "libmain.so(trace)", load_address);
-    load_address += LOAD_ADDRESS_STEP;
-#endif
+    if (file_exists(SO_PATH)) {
+        load_so_or_fail(&main_trace_mod, SO_PATH, "libmain.so", load_address);
+        main_trace_loaded = 1;
+        load_address += LOAD_ADDRESS_STEP;
+    } else {
+        l_warn("libmain.so not found at %s (continuing with libGameEngine bootstrap)", SO_PATH);
+        main_trace_loaded = 0;
+    }
 
 #ifdef LOAD_GAMEENGINE_SO
     so_mod = gameengine_mod;
@@ -213,9 +216,8 @@ void soloader_init_all() {
 #ifdef LOAD_GAMEENGINE_SO
     relocate_resolve_patch_init(&gameengine_mod);
 #endif
-#ifdef LOAD_MAIN_SO_FOR_TRACE
-    relocate_resolve_init(&main_trace_mod);
-#endif
+    if (main_trace_loaded)
+        relocate_resolve_init(&main_trace_mod);
 
     set_boot_stage(BOOT_STAGE_AFTER_SO_INIT, "main: after so init");
 
@@ -228,7 +230,18 @@ void soloader_init_all() {
 
 #ifdef LOAD_GAMEENGINE_SO
     set_boot_stage(BOOT_STAGE_BEFORE_GAME_ENTRY, "main: before game entry");
-    start_engine_via_libGameEngine();
+
+    int entry_ret = -1;
+    if (main_trace_loaded) {
+        entry_ret = start_engine_via_module(&main_trace_mod, "libmain.so");
+        if (entry_ret != 0)
+            l_warn("main: libmain.so entry returned %d, falling back to libGameEngine.so", entry_ret);
+    }
+
+    if (!main_trace_loaded || entry_ret != 0)
+        entry_ret = start_engine_via_module(&gameengine_mod, "libGameEngine.so");
+
+    l_info("main: engine entry returned %d", entry_ret);
     set_boot_stage(BOOT_STAGE_AFTER_GAME_ENTRY, "main: after game entry");
     g_boot_heartbeat_enabled = 0;
     return;
