@@ -149,9 +149,11 @@ static void *fmod_stream_chunk_alloc_patched(void *stream,
 
 static int fmod_system_validate_patched(void *system, void **validated, void *lock_scope) {
     if (!system) {
-        if (validated)
-            *validated = NULL;
-
+        // Some callers pass small integer sentinels instead of a writable
+        // `FMOD::System**` out pointer during early boot error paths.
+        // Never touch `validated` in this guard branch: even a non-null value
+        // may be an invalid address and would trigger a data abort.
+        (void)validated;
         l_warn("libfmod: blocked System::validate on null system pointer");
         return FMOD_ERR_MEMORY;
     }
