@@ -19,6 +19,10 @@
 extern "C" {
 #endif
 
+#include <netdb.h>
+#include <pwd.h>
+#include <setjmp.h>
+#include <sys/types.h>
 #include <sys/time.h>
 
 #define PAGE_SIZE 4096
@@ -54,6 +58,19 @@ int __atomic_cmpxchg(int old_value, int new_value, volatile int* ptr);
 char * getenv_soloader(const char * name);
 
 int setenv_soloader(const char * name, const char * value, int overwrite);
+
+int sigsetjmp_soloader(jmp_buf env, int savesigs);
+void siglongjmp_soloader(jmp_buf env, int value);
+
+unsigned int alarm_soloader(unsigned int seconds);
+uid_t geteuid_soloader(void);
+struct passwd *getpwuid_soloader(uid_t uid);
+int gethostbyname_r_soloader(const char *name,
+                             struct hostent *ret,
+                             char *buf,
+                             size_t buflen,
+                             struct hostent **result,
+                             int *h_errnop);
 
 int getpagesize(void);
 

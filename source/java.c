@@ -128,6 +128,18 @@ static jobject jni_getHardwareBoard(jmethodID id, va_list args) {
 	return jni->NewStringUTF(&jni, "PCH-1000");
 }
 
+static jfloat jni_getXDPI(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return 220.0f;
+}
+
+static jfloat jni_getYDPI(jmethodID id, va_list args) {
+	(void)id;
+	(void)args;
+	return 220.0f;
+}
+
 /*
  * JNI Methods
 */
@@ -147,6 +159,8 @@ NameToMethodID nameToMethodId[] = {
 		{ 111, "getLocale", METHOD_TYPE_OBJECT },
 		{ 112, "getHardwareOS", METHOD_TYPE_OBJECT },
 		{ 113, "getHardwareBoard", METHOD_TYPE_OBJECT },
+		{ 114, "getXDPI", METHOD_TYPE_FLOAT },
+		{ 115, "getYDPI", METHOD_TYPE_FLOAT },
 };
 
 MethodsBoolean methodsBoolean[] = {
@@ -156,7 +170,10 @@ MethodsBoolean methodsBoolean[] = {
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};
 MethodsDouble methodsDouble[] = {};
-MethodsFloat methodsFloat[] = {};
+MethodsFloat methodsFloat[] = {
+		{ 114, jni_getXDPI },
+		{ 115, jni_getYDPI },
+};
 MethodsInt methodsInt[] = {
 		{ 106, jni_getSampleRate },
 		{ 107, jni_getOutputFramesPerBuffer },
