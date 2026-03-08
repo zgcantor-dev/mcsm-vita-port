@@ -39,26 +39,20 @@ add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}")
 # Additional Android .so libraries (additive only)
 # -----------------------------------------------------------------------------
 set(GAMEENGINE_SO "${DATA_PATH}libGameEngine.so" CACHE STRING "Path to libGameEngine.so")
-set(FMOD_SO "${DATA_PATH}libfmod.so" CACHE STRING "Path to libfmod.so")
-set(FMODSTUDIO_SO "${DATA_PATH}libfmodstudio.so" CACHE STRING "Path to libfmodstudio.so")
+set(FMODSTUDIO_SUPRX "ur0:/data/libfmodstudio.suprx" CACHE STRING "Path to Vita FMOD Studio module")
 add_definitions(
   -DGAMEENGINE_SO="${GAMEENGINE_SO}"
-  -DFMOD_SO="${FMOD_SO}"
-  -DFMODSTUDIO_SO="${FMODSTUDIO_SO}"
+  -DFMODSTUDIO_SUPRX="${FMODSTUDIO_SUPRX}"
 )
 
 # Optional runtime-loading switches (only affect code if you use these defines)
 option(LOAD_GAMEENGINE_SO "Load libGameEngine.so at runtime" ON)
-option(LOAD_FMOD "Load libfmod.so at runtime" ON)
-option(LOAD_FMODSTUDIO "Load libfmodstudio.so at runtime (if needed)" ON)
+option(LOAD_FMODSTUDIO_SUPRX "Load libfmodstudio.suprx at runtime" ON)
 if (LOAD_GAMEENGINE_SO)
   add_definitions(-DLOAD_GAMEENGINE_SO)
 endif()
-if (LOAD_FMOD)
-  add_definitions(-DLOAD_FMOD)
-endif()
-if (LOAD_FMODSTUDIO)
-  add_definitions(-DLOAD_FMODSTUDIO)
+if (LOAD_FMODSTUDIO_SUPRX)
+  add_definitions(-DLOAD_FMODSTUDIO_SUPRX)
 endif()
 option(DEBUG_TRACE "Enable verbose so_loader tracing" ON)
 if (DEBUG_TRACE)
@@ -231,6 +225,8 @@ endif()
 target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
                       OpenSLES
+                      fmodpp
+                      fmodstudio_stub
                       ${SDL2_LIBS}
                       ${AUDIO_LIBS}
                       stdc++
@@ -260,6 +256,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
                       SceCtrl_stub
                       SceGxm_stub
                       ScePower_stub
+                      SceSysmodule_stub
                       SceTouch_stub
                       SceVshBridge_stub
                       )
