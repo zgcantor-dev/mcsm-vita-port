@@ -30,9 +30,12 @@ static so_hook fmod_memory_initialize_hook;
 static uintptr_t fmod_memory_initialize_addr;
 static so_hook fmod_stream_chunk_alloc_hook;
 static uintptr_t fmod_stream_chunk_alloc_addr;
+static so_hook fmod_system_validate_hook;
+static uintptr_t fmod_system_validate_addr;
 
 #define FMOD_ERR_INTERNAL 28
 #define FMOD_ERR_INVALID_PARAM 31
+#define FMOD_ERR_MEMORY 38
 
 static void *get_fmod_globals_flags_ptr(void) {
     if (!fmod_system_get_userdata_addr)
@@ -144,6 +147,18 @@ static void *fmod_stream_chunk_alloc_patched(void *stream,
                        from_worker);
 }
 
+static int fmod_system_validate_patched(void *system, void **validated, void *lock_scope) {
+    if (!system) {
+        if (validated)
+            *validated = NULL;
+
+        l_warn("libfmod: blocked System::validate on null system pointer");
+        return FMOD_ERR_MEMORY;
+    }
+
+    return SO_CONTINUE(int, fmod_system_validate_hook, system, validated, lock_scope);
+}
+
 void so_patch_fmod(so_module *mod) {
     if (!mod)
         return;
@@ -175,6 +190,14 @@ void so_patch_fmod(so_module *mod) {
     fmod_stream_chunk_alloc_addr = mod->text_base + 0x000C8550;
     fmod_stream_chunk_alloc_hook = hook_addr(fmod_stream_chunk_alloc_addr, (uintptr_t)&fmod_stream_chunk_alloc_patched);
     l_info("libfmod: patched stream allocator helper at 0x%08x", (unsigned)fmod_stream_chunk_alloc_addr);
+
+    // _ZN4FMOD7SystemI8validateEPNS_6SystemEPPS0_PNS_15SystemLockScopeE
+    // starts by writing through `system` (str r3, [r0], #0x28 at +0x18) and
+    // crashes if FMOD_System_Create forwards a null allocation result.
+    // Guard this path and return the canonical memory failure code instead.
+    fmod_system_validate_addr = mod->text_base + 0x000372BC;
+    fmod_system_validate_hook = hook_addr(fmod_system_validate_addr, (uintptr_t)&fmod_system_validate_patched);
+    l_info("libfmod: patched System::validate at 0x%08x", (unsigned)fmod_system_validate_addr);
 }
 static so_hook begin_static_vertices_hook;
 static so_hook begin_static_indices_hook;
