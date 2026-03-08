@@ -70,7 +70,7 @@ static jboolean jni_hasFeature(jmethodID id, va_list args) {
 	if (strcmp(feature, "android.hardware.touchscreen") == 0)
 		supported = JNI_TRUE;
 
-	jni->ReleaseStringUTFChars(&jni, feature_jstr, feature);
+	jni->ReleaseStringUTFChars(&jni, feature_jstr, (char *)feature);
 	return supported;
 }
 

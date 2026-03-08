@@ -25,6 +25,10 @@
 #include "utils/utils.h"
 #include "utils/logger.h"
 
+#ifndef HOST_NOT_FOUND
+#define HOST_NOT_FOUND 1
+#endif
+
 #define BIONIC_CLOCK_REALTIME           0
 #define BIONIC_CLOCK_MONOTONIC          1
 #define BIONIC_CLOCK_PROCESS_CPUTIME_ID 2
