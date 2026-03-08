@@ -205,9 +205,10 @@ void soloader_init_all() {
     so_flush_caches(&fmod_mod);
 #endif
 #ifdef LOAD_FMODSTUDIO
-    // Keep initialization strategy consistent with libfmod: avoid Android-only
-    // constructor side effects in FMOD runtime libs.
-    relocate_resolve_no_init(&fmodstudio_mod);
+    // libfmodstudio constructors are required to register core Studio systems.
+    // Skipping them can leave the engine stuck on the startup logo waiting for
+    // Studio initialization that never completes.
+    relocate_resolve_init(&fmodstudio_mod);
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     relocate_resolve_patch_init(&gameengine_mod);
