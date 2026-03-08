@@ -19,6 +19,38 @@
 #endif
 
 #ifdef USE_SDL2
+static int should_filter_sdl_event(const SDL_Event *event) {
+    if (!event)
+        return 0;
+
+    // Vita SDL2 backend emits a recurring user event 0x802 (2050) that Android
+    // builds of MCSM do not handle, resulting in constant "Unhandled event" spam.
+    if (event->type == (SDL_USEREVENT + 2))
+        return 1;
+
+    // Drop startup window notifications that are noisy and not actionable here.
+    if (event->type == SDL_WINDOWEVENT) {
+        if (event->window.event == SDL_WINDOWEVENT_SHOWN ||
+            event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+            return 1;
+    }
+
+    return 0;
+}
+
+int SDL_PollEvent_filtered(SDL_Event *event) {
+    int ret;
+
+    while ((ret = SDL_PollEvent(event)) == 1) {
+        if (should_filter_sdl_event(event))
+            continue;
+
+        return ret;
+    }
+
+    return ret;
+}
+
 SDL_Window *SDL_CreateWindow_logged(const char *title, int x, int y,
                                            int w, int h, Uint32 flags) {
     SDL_Window *window = SDL_CreateWindow(title, x, y, w, h, flags);
@@ -469,7 +501,7 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_JoystickUpdate", (void *)&SDL_JoystickUpdate },
     { "SDL_Log", (void *)&SDL_Log },
     { "SDL_NumJoysticks", (void *)&SDL_NumJoysticks },
-    { "SDL_PollEvent", (void *)&SDL_PollEvent },
+    { "SDL_PollEvent", (void *)&SDL_PollEvent_filtered },
     { "SDL_PushEvent", (void *)&SDL_PushEvent },
     { "SDL_Quit", (void *)&SDL_Quit },
     { "SDL_SetHint", (void *)&SDL_SetHint },

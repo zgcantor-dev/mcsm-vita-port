@@ -42,6 +42,7 @@ void glDeleteBuffers_soloader(GLsizei n, const GLuint *buffers);
 
 #ifdef USE_SDL2
 #include <SDL2/SDL.h>
+int SDL_PollEvent_filtered(SDL_Event *event);
 SDL_Window *SDL_CreateWindow_logged(const char *title, int x, int y,
                                     int w, int h, Uint32 flags);
 SDL_GLContext SDL_GL_CreateContext_logged(SDL_Window *window);
