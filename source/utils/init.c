@@ -22,6 +22,7 @@
 #include <psp2/appmgr.h>
 #include <psp2/apputil.h>
 #include <psp2/kernel/clib.h>
+#include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/power.h>
 
@@ -41,12 +42,6 @@ extern so_module so_mod;
 #ifdef LOAD_GAMEENGINE_SO
 static so_module gameengine_mod;
 #endif
-#ifdef LOAD_FMOD
-static so_module fmod_mod;
-#endif
-#ifdef LOAD_FMODSTUDIO
-static so_module fmodstudio_mod;
-#endif
 static so_module main_trace_mod;
 static int main_trace_loaded;
 
@@ -65,17 +60,26 @@ static void load_so_or_fail(so_module *mod, const char *path, const char *name, 
     l_success("Loaded %s.", name);
 }
 
+static void load_module_or_fail(const char *path, const char *name) {
+    if (!file_exists(path)) {
+        l_fatal("Required dependency missing: %s (%s)", name, path);
+        fatal_error("Error: missing required dependency %s at %s.", name, path);
+    }
+
+    int res = sceKernelLoadStartModule(path, 0, NULL, 0, NULL, NULL);
+    if (res < 0) {
+        l_fatal("Could not load %s (%s): 0x%x", name, path, res);
+        fatal_error("Error: could not load %s.", path);
+    }
+
+    l_success("Loaded %s.", name);
+}
+
 static void relocate_resolve_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
     so_flush_caches(mod);
     so_initialize(mod);
-}
-
-static void relocate_resolve_no_init(so_module *mod) {
-    so_relocate(mod);
-    resolve_imports(mod);
-    so_flush_caches(mod);
 }
 
 static void relocate_resolve_patch_init(so_module *mod) {
@@ -174,13 +178,10 @@ void soloader_init_all() {
 
     uintptr_t load_address = LOAD_ADDRESS;
 
-#ifdef LOAD_FMOD
-    load_so_or_fail(&fmod_mod, FMOD_SO, "libfmod.so", load_address);
-    load_address += LOAD_ADDRESS_STEP;
-#endif
-#ifdef LOAD_FMODSTUDIO
-    load_so_or_fail(&fmodstudio_mod, FMODSTUDIO_SO, "libfmodstudio.so", load_address);
-    load_address += LOAD_ADDRESS_STEP;
+#ifdef LOAD_FMODSTUDIO_SUPRX
+    load_module_or_fail("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
+    load_module_or_fail("vs0:sys/external/libc.suprx", "libc.suprx");
+    load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
@@ -199,20 +200,6 @@ void soloader_init_all() {
     so_mod = gameengine_mod;
 #endif
 
-#ifdef LOAD_FMOD
-    // libfmod's JNI_OnLoad dereferences Android runtime state that is absent on Vita
-    // and crashes during constructors (null JavaVM table). Keep it relocated/resolved,
-    // but skip constructor execution.
-    relocate_resolve_no_init(&fmod_mod);
-    so_patch_fmod(&fmod_mod);
-    so_flush_caches(&fmod_mod);
-#endif
-#ifdef LOAD_FMODSTUDIO
-    // libfmodstudio constructors are required to register core Studio systems.
-    // Skipping them can leave the engine stuck on the startup logo waiting for
-    // Studio initialization that never completes.
-    relocate_resolve_init(&fmodstudio_mod);
-#endif
 #ifdef LOAD_GAMEENGINE_SO
     relocate_resolve_patch_init(&gameengine_mod);
 #endif
