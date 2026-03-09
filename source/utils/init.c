@@ -25,6 +25,8 @@
 #include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/power.h>
+#include <psp2/net/net.h>
+#include <psp2/sysmodule.h>
 
 #include <falso_jni/FalsoJNI.h>
 #include <so_util/so_util.h>
@@ -89,6 +91,29 @@ static int load_module_or_warn(const char *path, const char *name) {
 
     l_success("Loaded %s.", name);
     return 0;
+}
+
+
+static void ensure_net_for_fmod() {
+    int res = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+    if (res < 0)
+        l_warn("Could not load NET sysmodule: 0x%x", res);
+
+    int netstat = sceNetShowNetstat();
+    if (netstat == SCE_NET_ERROR_ENOTINIT) {
+        static unsigned char net_memory[141 * 1024];
+        SceNetInitParam initparam = {
+            .memory = net_memory,
+            .size = sizeof(net_memory),
+            .flags = 0,
+        };
+
+        int net_res = sceNetInit(&initparam);
+        if (net_res < 0)
+            l_warn("sceNetInit failed: 0x%x", net_res);
+        else
+            l_success("SceNet initialized for FMOD dependency.");
+    }
 }
 
 static void relocate_resolve_init(so_module *mod) {
@@ -198,6 +223,8 @@ void soloader_init_all() {
     uintptr_t load_address = LOAD_ADDRESS;
 
 #ifdef LOAD_FMODSTUDIO_SUPRX
+    // FMOD imports SceNet directly; load/initialize NET through sysmodule first.
+    ensure_net_for_fmod();
     load_module_or_warn("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
     load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
     load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
