@@ -226,7 +226,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
                       OpenSLES
                       fmodpp
-                      fmodstudio_stub
+                      -Wl,--whole-archive fmodstudio_stub -Wl,--no-whole-archive
                       ${SDL2_LIBS}
                       ${AUDIO_LIBS}
                       stdc++
