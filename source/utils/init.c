@@ -198,6 +198,10 @@ void soloader_init_all() {
     uintptr_t load_address = LOAD_ADDRESS;
 
 #ifdef LOAD_FMODSTUDIO_SUPRX
+    // FMOD depends on SceNet being available on some firmwares/runtime setups.
+    // Preloading these modules avoids "Library not found: [SceNet, ver=1]".
+    load_module_or_warn("vs0:sys/external/libSceNet.suprx", "libSceNet.suprx");
+    load_module_or_warn("vs0:sys/external/libSceNetCtl.suprx", "libSceNetCtl.suprx");
     load_module_or_warn("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
     load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
     load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
