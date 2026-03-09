@@ -75,6 +75,22 @@ static void load_module_or_fail(const char *path, const char *name) {
     l_success("Loaded %s.", name);
 }
 
+static int load_module_or_warn(const char *path, const char *name) {
+    if (!file_exists(path)) {
+        l_warn("Optional dependency missing: %s (%s)", name, path);
+        return -1;
+    }
+
+    int res = sceKernelLoadStartModule(path, 0, NULL, 0, NULL, NULL);
+    if (res < 0) {
+        l_warn("Could not load optional dependency %s (%s): 0x%x", name, path, res);
+        return res;
+    }
+
+    l_success("Loaded %s.", name);
+    return 0;
+}
+
 static void relocate_resolve_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
@@ -108,8 +124,11 @@ static void configure_system() {
     scePowerSetGpuXbarClockFrequency(166);
 
 #ifdef USE_SCELIBC_IO
-    if (fios_init(DATA_PATH) == 0)
+    int fios_res = fios_init(DATA_PATH);
+    if (fios_res == 0)
         l_success("FIOS initialized.");
+    else
+        l_warn("FIOS initialization skipped (0x%x)", fios_res);
 #endif
 
     if (!module_loaded("kubridge")) {
@@ -179,8 +198,8 @@ void soloader_init_all() {
     uintptr_t load_address = LOAD_ADDRESS;
 
 #ifdef LOAD_FMODSTUDIO_SUPRX
-    load_module_or_fail("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
-    load_module_or_fail("vs0:sys/external/libc.suprx", "libc.suprx");
+    load_module_or_warn("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
+    load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
     load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
 #endif
 #ifdef LOAD_GAMEENGINE_SO

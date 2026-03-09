@@ -58,6 +58,7 @@ int fios_init(const char * path) {
         return -1;
 
     memset(&g_RamCacheContext, 0, sizeof(g_RamCacheContext));
+    g_RamCacheContext.sizeOfContext = sizeof(g_RamCacheContext);
     g_RamCacheContext.pPath = path;
     g_RamCacheContext.pWorkBuffer = g_RamCacheWorkBuffer;
     g_RamCacheContext.workBufferSize = RAMCACHEBLOCKNUM * RAMCACHEBLOCKSIZE;
