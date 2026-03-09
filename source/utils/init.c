@@ -60,19 +60,35 @@ static void load_so_or_fail(so_module *mod, const char *path, const char *name, 
     l_success("Loaded %s.", name);
 }
 
-static void load_module_or_fail(const char *path, const char *name) {
-    if (!file_exists(path)) {
-        l_fatal("Required dependency missing: %s (%s)", name, path);
-        fatal_error("Error: missing required dependency %s at %s.", name, path);
+static void load_module_candidates_or_fail(const char *const *paths, size_t count, const char *name) {
+    int first_load_error = 0;
+
+    for (size_t i = 0; i < count; i++) {
+        const char *path = paths[i];
+        if (!file_exists(path))
+            continue;
+
+        int res = sceKernelLoadStartModule(path, 0, NULL, 0, NULL, NULL);
+        if (res >= 0) {
+            l_success("Loaded %s from %s.", name, path);
+            return;
+        }
+
+        if (!first_load_error)
+            first_load_error = res;
+
+        l_warn("Could not load %s (%s): 0x%x", name, path, res);
     }
 
-    int res = sceKernelLoadStartModule(path, 0, NULL, 0, NULL, NULL);
-    if (res < 0) {
-        l_fatal("Could not load %s (%s): 0x%x", name, path, res);
-        fatal_error("Error: could not load %s.", path);
+    if (first_load_error) {
+        l_fatal("Could not load %s from any known location (first error: 0x%x)", name, first_load_error);
+        fatal_error("Error: failed to load %s (error 0x%08x). File exists, but the module may be incompatible/corrupted or missing runtime dependencies.",
+                    name,
+                    (unsigned)first_load_error);
     }
 
-    l_success("Loaded %s.", name);
+    l_fatal("Required dependency missing: %s", name);
+    fatal_error("Error: missing required dependency %s.", name);
 }
 
 static int load_module_or_warn(const char *path, const char *name) {
@@ -200,7 +216,15 @@ void soloader_init_all() {
 #ifdef LOAD_FMODSTUDIO_SUPRX
     load_module_or_warn("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
     load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
-    load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
+    const char *fmodstudio_candidates[] = {
+        FMODSTUDIO_SUPRX,
+        "ur0:/data/external/libfmodstudio.suprx",
+        "ux0:/data/libfmodstudio.suprx",
+        "ux0:/data/external/libfmodstudio.suprx",
+    };
+    load_module_candidates_or_fail(fmodstudio_candidates,
+                                   sizeof(fmodstudio_candidates) / sizeof(fmodstudio_candidates[0]),
+                                   "libfmodstudio.suprx");
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
