@@ -535,7 +535,7 @@ so_default_dynlib default_dynlib[] = {
         { "read", (uintptr_t)&read },
         { "realpath", (uintptr_t)&realpath },
         { "remove", (uintptr_t)&remove },
-        { "rename", (uintptr_t)&rename },
+        { "rename", (uintptr_t)&rename_soloader },
         { "rewind", (uintptr_t)&rewind },
         { "rmdir", (uintptr_t)&rmdir },
         { "truncate", (uintptr_t)&truncate },
