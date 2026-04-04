@@ -1,6 +1,9 @@
 #ifndef FMOD_SYMBOLS_H
 #define FMOD_SYMBOLS_H
 
+#define FMOD_WEAK_EXTERN extern __attribute__((weak))
+#define extern FMOD_WEAK_EXTERN
+
 extern void *FMOD_Memory_GetStats;
 extern void *FMOD_Memory_Initialize;
 extern void *_ZN4FMOD12ChannelGroup10getChannelEiPPNS_7ChannelE;
@@ -127,5 +130,8 @@ extern void *_ZNK4FMOD6Studio6System12getBankCountEPi;
 extern void *_ZNK4FMOD6Studio6System12getEventByIDEPK9FMOD_GUIDPPNS0_16EventDescriptionE;
 extern void *_ZNK4FMOD6Studio6System12getSoundInfoEPKcP22FMOD_STUDIO_SOUND_INFO;
 extern void *_ZNK4FMOD6Studio6System17getLowLevelSystemEPPNS_6SystemE;
+
+#undef extern
+#undef FMOD_WEAK_EXTERN
 
 #endif // FMOD_SYMBOLS_H
