@@ -209,7 +209,7 @@ set(SDL2_LIBS "")
 # breaks GNU ld with: ".symtab local symbol at index 0 (>= sh_info of 0)".
 # Repack the toolchain stub without _head.o and link the sanitized archive.
 set(FMODSTUDIO_STUB_LIB "fmodstudio_stub")
-option(FIX_BROKEN_FMODSTUDIO_STUB "Sanitize malformed fmodstudio stub archives" ON)
+option(FIX_BROKEN_FMODSTUDIO_STUB "Sanitize malformed fmodstudio stub archives" OFF)
 if (FIX_BROKEN_FMODSTUDIO_STUB)
   find_library(FMODSTUDIO_STUB_PATH NAMES fmodstudio_stub)
   if (FMODSTUDIO_STUB_PATH)
