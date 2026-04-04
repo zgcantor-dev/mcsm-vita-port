@@ -211,6 +211,15 @@ static so_hook begin_static_indices_hook;
 static so_hook vertex_buffer_lock_hook;
 static so_hook vertex_buffer_platform_lock_hook;
 static so_hook vertex_buffer_platform_unlock_hook;
+
+#define SDL_MOUSE_STRUCT_VADDR 0x8154D698u
+#define SDL_MOUSE_WARP_CB_OFFSET 0x14u
+
+static void sdl_mouse_warp_noop(void *window, int x, int y) {
+    (void)window;
+    (void)x;
+    (void)y;
+}
 // RenderUtility::Initialize() can request count=0xFFFF and then write
 // 16-byte records, requiring up to 1 MiB. Keep a 1 MiB emergency buffer
 // for bad pointers returned by BeginStaticVertices.
@@ -489,6 +498,13 @@ static void *begin_static_indices_patched(void *index_buffer, int count) {
 }
 
 void so_patch(void) {
+    uintptr_t sdl_mouse_addr = so_mod.text_base + (SDL_MOUSE_STRUCT_VADDR - 0x81000000u);
+    void **warp_mouse_cb = (void **)(sdl_mouse_addr + SDL_MOUSE_WARP_CB_OFFSET);
+    *warp_mouse_cb = (void *)&sdl_mouse_warp_noop;
+    l_warn("SDL mouse warp callback patched to no-op (SDL_mouse=%p cb=%p)",
+           (void *)sdl_mouse_addr,
+           *warp_mouse_cb);
+
     // _ZN14T3VertexBuffer12PlatformLockEb
     vertex_buffer_platform_lock_hook = hook_addr(so_mod.text_base + 0x0057B998, (uintptr_t)&vertex_buffer_platform_lock_patched);
 
