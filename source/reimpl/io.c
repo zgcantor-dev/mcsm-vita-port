@@ -524,6 +524,38 @@ int open_soloader(const char * path, int oflag, ...) {
     return ret;
 }
 
+int rename_soloader(const char *oldpath, const char *newpath) {
+    if (!oldpath || !newpath) {
+        l_warn("rename(%p, %p): invalid arguments", oldpath, newpath);
+        return -1;
+    }
+
+    const char *resolved_oldpath = oldpath;
+    const char *resolved_newpath = newpath;
+    char remapped_oldpath[PATH_MAX];
+    char remapped_newpath[PATH_MAX];
+
+    if (remap_android_storage_path(oldpath, remapped_oldpath, sizeof(remapped_oldpath))) {
+        resolved_oldpath = remapped_oldpath;
+    } else if (remap_telltale_extracted_data_path(oldpath, remapped_oldpath, sizeof(remapped_oldpath))) {
+        resolved_oldpath = remapped_oldpath;
+    }
+
+    if (remap_android_storage_path(newpath, remapped_newpath, sizeof(remapped_newpath))) {
+        resolved_newpath = remapped_newpath;
+    } else if (remap_telltale_extracted_data_path(newpath, remapped_newpath, sizeof(remapped_newpath))) {
+        resolved_newpath = remapped_newpath;
+    }
+
+    int ret = rename(resolved_oldpath, resolved_newpath);
+    if (ret == 0)
+        l_debug("rename(%s => %s, %s => %s): %i", oldpath, resolved_oldpath, newpath, resolved_newpath, ret);
+    else
+        l_warn("rename(%s => %s, %s => %s): %i", oldpath, resolved_oldpath, newpath, resolved_newpath, ret);
+
+    return ret;
+}
+
 int fstat_soloader(int fd, stat64_bionic * buf) {
     struct stat st;
     int res = fstat(fd, &st);

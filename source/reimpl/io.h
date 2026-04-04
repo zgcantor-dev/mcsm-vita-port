@@ -118,6 +118,8 @@ ssize_t pread_soloader(int fd, void *buf, size_t count, off_t offset);
 
 ssize_t pwrite_soloader(int fd, const void *buf, size_t count, off_t offset);
 
+int rename_soloader(const char *oldpath, const char *newpath);
+
 #ifdef __cplusplus
 };
 #endif
