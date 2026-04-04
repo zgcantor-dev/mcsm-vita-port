@@ -34,6 +34,7 @@
 
 #include "android_shims.h"
 #include "engine_bootstrap.h"
+#include "fmod_symbols.h"
 
 #define LOAD_ADDRESS 0x98000000
 #define LOAD_ADDRESS_STEP 0x02000000
@@ -126,6 +127,12 @@ static void relocate_resolve_init(so_module *mod) {
 static void relocate_resolve_patch_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
+#ifdef LOAD_FMODSTUDIO_SUPRX
+    if (!FMOD_Memory_Initialize) {
+        l_fatal("FMOD_Memory_Initialize is unresolved after import resolution.");
+        fatal_error("Error: unresolved FMOD imports. Ensure libfmodstudio.suprx is installed at %s.", FMODSTUDIO_SUPRX);
+    }
+#endif
     so_patch();
     so_flush_caches(mod);
     so_initialize(mod);
