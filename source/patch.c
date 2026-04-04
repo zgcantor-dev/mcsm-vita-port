@@ -211,11 +211,18 @@ static so_hook begin_static_indices_hook;
 static so_hook vertex_buffer_lock_hook;
 static so_hook vertex_buffer_platform_lock_hook;
 static so_hook vertex_buffer_platform_unlock_hook;
+static so_hook sdl_warp_mouse_hook;
 
 #define SDL_MOUSE_STRUCT_VADDR 0x8154D698u
 #define SDL_MOUSE_WARP_CB_OFFSET 0x14u
 
 static void sdl_mouse_warp_noop(void *window, int x, int y) {
+    (void)window;
+    (void)x;
+    (void)y;
+}
+
+static void sdl_warp_mouse_patched(void *window, int x, int y) {
     (void)window;
     (void)x;
     (void)y;
@@ -516,18 +523,27 @@ static void *begin_static_indices_patched(void *index_buffer, int count) {
 }
 
 void so_patch(void) {
-    uintptr_t sdl_mouse_addr = so_symbol(&so_mod, "SDL_mouse");
-    if (!sdl_mouse_addr)
-        sdl_mouse_addr = so_mod.text_base + (SDL_MOUSE_STRUCT_VADDR - 0x81000000u);
+    uintptr_t sdl_warp_mouse_addr = so_symbol(&so_mod, "SDL_WarpMouseInWindow");
+    if (!sdl_warp_mouse_addr)
+        sdl_warp_mouse_addr = so_symbol(&so_mod, "SDL_WarpMouseGlobal");
 
-    void **warp_mouse_cb = (void **)(sdl_mouse_addr + SDL_MOUSE_WARP_CB_OFFSET);
-    if (!addr_in_so_data_range((uintptr_t)warp_mouse_cb, sizeof(*warp_mouse_cb))) {
-        l_error("SDL mouse warp callback patch skipped: target %p is outside writable SO data ranges", warp_mouse_cb);
+    if (sdl_warp_mouse_addr) {
+        sdl_warp_mouse_hook = hook_addr(sdl_warp_mouse_addr, (uintptr_t)&sdl_warp_mouse_patched);
+        l_warn("SDL warp function patched to no-op at 0x%08X", (unsigned)sdl_warp_mouse_addr);
     } else {
-        *warp_mouse_cb = (void *)&sdl_mouse_warp_noop;
-        l_warn("SDL mouse warp callback patched to no-op (SDL_mouse=%p cb=%p)",
-               (void *)sdl_mouse_addr,
-               *warp_mouse_cb);
+        uintptr_t sdl_mouse_addr = so_symbol(&so_mod, "SDL_mouse");
+        if (!sdl_mouse_addr)
+            sdl_mouse_addr = so_mod.text_base + (SDL_MOUSE_STRUCT_VADDR - 0x81000000u);
+
+        void **warp_mouse_cb = (void **)(sdl_mouse_addr + SDL_MOUSE_WARP_CB_OFFSET);
+        if (!addr_in_so_data_range((uintptr_t)warp_mouse_cb, sizeof(*warp_mouse_cb))) {
+            l_warn("SDL mouse warp callback patch skipped: target %p is outside writable SO data ranges", warp_mouse_cb);
+        } else {
+            *warp_mouse_cb = (void *)&sdl_mouse_warp_noop;
+            l_warn("SDL mouse warp callback patched to no-op (SDL_mouse=%p cb=%p)",
+                   (void *)sdl_mouse_addr,
+                   *warp_mouse_cb);
+        }
     }
 
     // _ZN14T3VertexBuffer12PlatformLockEb
