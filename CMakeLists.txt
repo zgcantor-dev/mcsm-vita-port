@@ -204,6 +204,32 @@ option(USE_SNDFILE "Link libsndfile (may require mpg123/mp3lame/opus/etc)" ON)
 
 set(AUDIO_LIBS "")
 set(SDL2_LIBS "")
+
+# Some VitaSDK builds ship a malformed libfmodstudio_stub.a where the _head.o member
+# breaks GNU ld with: ".symtab local symbol at index 0 (>= sh_info of 0)".
+# Repack the toolchain stub without _head.o and link the sanitized archive.
+set(FMODSTUDIO_STUB_LIB "fmodstudio_stub")
+option(FIX_BROKEN_FMODSTUDIO_STUB "Sanitize malformed fmodstudio stub archives" ON)
+if (FIX_BROKEN_FMODSTUDIO_STUB)
+  find_library(FMODSTUDIO_STUB_PATH NAMES fmodstudio_stub)
+  if (FMODSTUDIO_STUB_PATH)
+    set(FMODSTUDIO_STUB_SANITIZED "${CMAKE_BINARY_DIR}/libfmodstudio_stub_sanitized.a")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND}
+        -DINPUT_ARCHIVE=${FMODSTUDIO_STUB_PATH}
+        -DOUTPUT_ARCHIVE=${FMODSTUDIO_STUB_SANITIZED}
+        -DCMAKE_AR=${CMAKE_AR}
+        -DCMAKE_RANLIB=${CMAKE_RANLIB}
+        -P ${CMAKE_SOURCE_DIR}/cmake/fix_fmodstudio_stub.cmake
+      RESULT_VARIABLE FMODSTUDIO_STUB_FIX_RESULT
+    )
+    if (FMODSTUDIO_STUB_FIX_RESULT EQUAL 0)
+      set(FMODSTUDIO_STUB_LIB "${FMODSTUDIO_STUB_SANITIZED}")
+    else()
+      message(WARNING "Failed to sanitize fmodstudio stub archive. Falling back to default fmodstudio_stub library.")
+    endif()
+  endif()
+endif()
 if (USE_SDL2)
   list(APPEND SDL2_LIBS SDL2)
 endif()
@@ -226,7 +252,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
                       -Wl,--whole-archive pthread -Wl,--no-whole-archive
                       OpenSLES
                       fmodpp
-                      -Wl,--whole-archive fmodstudio_stub -Wl,--no-whole-archive
+                      ${FMODSTUDIO_STUB_LIB}
                       ${SDL2_LIBS}
                       ${AUDIO_LIBS}
                       stdc++
