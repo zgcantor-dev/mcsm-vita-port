@@ -39,7 +39,7 @@ add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}")
 # Additional Android .so libraries (additive only)
 # -----------------------------------------------------------------------------
 set(GAMEENGINE_SO "${DATA_PATH}libGameEngine.so" CACHE STRING "Path to libGameEngine.so")
-set(FMODSTUDIO_SUPRX "ur0:/data/libfmodstudio.suprx" CACHE STRING "Path to Vita FMOD Studio module")
+set(FMODSTUDIO_SUPRX "ur0:data/libfmodstudio.suprx" CACHE STRING "Path to Vita FMOD Studio module")
 add_definitions(
   -DGAMEENGINE_SO="${GAMEENGINE_SO}"
   -DFMODSTUDIO_SUPRX="${FMODSTUDIO_SUPRX}"
