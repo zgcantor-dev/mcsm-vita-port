@@ -223,6 +223,14 @@ void SDL_SetMainReady_REAL(void) {
 #endif
 }
 
+char *SDL_strdup_REAL(const char *str) {
+#ifdef USE_SDL2
+    return SDL_strdup(str);
+#else
+    return str ? strdup(str) : NULL;
+#endif
+}
+
 int gettid(void) {
     return (int)sceKernelGetThreadId();
 }
@@ -520,6 +528,7 @@ static builtin_symbol g_builtin_symbols[] = {
     { "SDL_Android_Init", (void *)&SDL_Android_Init },
     { "Android_JNI_SetupThread", (void *)&Android_JNI_SetupThread },
     { "SDL_SetMainReady_REAL", (void *)&SDL_SetMainReady_REAL },
+    { "SDL_strdup_REAL", (void *)&SDL_strdup_REAL },
     { "glMapBufferOES", (void *)&glMapBufferOES_soloader },
     { "glUnmapBufferOES", (void *)&glUnmapBufferOES_soloader },
     { "glIsVertexArrayOES", (void *)&glIsVertexArrayOES_soloader },

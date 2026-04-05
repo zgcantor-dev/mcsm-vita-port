@@ -31,6 +31,7 @@ int SDL_AndroidGetExternalStorageState(void);
 int SDL_Android_Init(void);
 int Android_JNI_SetupThread(void);
 void SDL_SetMainReady_REAL(void);
+char *SDL_strdup_REAL(const char *str);
 int gettid(void);
 
 void *glMapBufferOES_soloader(GLenum target, GLenum access);

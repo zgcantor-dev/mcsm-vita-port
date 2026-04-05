@@ -282,6 +282,7 @@ so_default_dynlib default_dynlib[] = {
         { "SDL_PushEvent", (uintptr_t)&SDL_PushEvent },
         { "SDL_Quit", (uintptr_t)&SDL_Quit },
         { "SDL_SetHint", (uintptr_t)&SDL_SetHint },
+        { "SDL_strdup_REAL", (uintptr_t)&SDL_strdup_REAL },
         { "SDL_ShowCursor", (uintptr_t)&SDL_ShowCursor },
 #endif
 
