@@ -209,7 +209,8 @@ const char *android_shims_get_data_root(void) {
 }
 
 int SDL_Android_Init(void) {
-    return 0;
+    // SDL Android bootstrap expects non-zero on success.
+    return 1;
 }
 
 int Android_JNI_SetupThread(void) {

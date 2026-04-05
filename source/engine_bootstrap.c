@@ -44,8 +44,21 @@ int start_engine_via_module(so_module *engine, const char *tag) {
     // Avoid PSVita SDL backend default log file output (ux0:/data/SDL_Log.txt).
     SDL_LogSetOutputFunction(sdl_log_sink_noop, NULL);
 
-    SDL_Android_Init();
+    int android_init_ret = SDL_Android_Init();
+    _log_printf("[BOOT] %s: SDL_Android_Init -> %d\n", label, android_init_ret);
+    if (android_init_ret == 0)
+        l_warn("[BOOT] %s: SDL_Android_Init reported failure", label);
+
     SDL_SetMainReady_REAL();
+
+    typedef int (*NativeInitFn)(void *env, void *activity);
+    NativeInitFn native_init = (NativeInitFn)so_symbol(engine, "Java_org_libsdl_app_SDLActivity_nativeInit");
+    if (native_init) {
+        _log_printf("[BOOT] %s: calling Java_org_libsdl_app_SDLActivity_nativeInit\n", label);
+        int ret = native_init(NULL, NULL);
+        _log_printf("[BOOT] %s: nativeInit returned %d\n", label, ret);
+        return ret;
+    }
 
     char *argv0 = sdl_strdup_local("SDL_app");
     char *argv[] = { argv0, NULL };
