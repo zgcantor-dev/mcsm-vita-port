@@ -1,6 +1,7 @@
 #include <falso_jni/FalsoJNI.h>
 #include <falso_jni/FalsoJNI_Impl.h>
 #include <falso_jni/FalsoJNI_Logger.h>
+#include <so_util/so_util.h>
 #include <string.h>
 
 #define TELLTALE_PKG_NAME "com.telltalegames.minecraft100"
@@ -9,6 +10,21 @@
 
 #define TELLTALE_MAIN_OBB_ANDROID_PATH TELLTALE_EXTERNAL_STORAGE_ROOT "/Android/obb/" TELLTALE_PKG_NAME "/main." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
 #define TELLTALE_PATCH_OBB_ANDROID_PATH TELLTALE_EXTERNAL_STORAGE_ROOT "/Android/obb/" TELLTALE_PKG_NAME "/patch." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
+
+extern so_module so_mod;
+
+typedef void (*native_on_permission_complete_fn)(JNIEnv *env, jobject thiz, jint request_code, jboolean granted);
+
+static native_on_permission_complete_fn resolve_native_permission_callback(void) {
+	static native_on_permission_complete_fn cached;
+	static int resolved;
+	if (!resolved) {
+		resolved = 1;
+		cached = (native_on_permission_complete_fn)so_symbol(
+				&so_mod, "Java_com_telltalegames_telltale_TelltaleActivity_nativeOnPermissionComplete");
+	}
+	return cached;
+}
 
 static jobject jni_getObbFileName(jmethodID id, va_list args) {
 	(void)id;
@@ -98,6 +114,36 @@ static jboolean jni_isUsingBluetooth(jmethodID id, va_list args) {
 	return JNI_FALSE;
 }
 
+static jboolean jni_hasPermission(jmethodID id, va_list args) {
+	(void)id;
+	jstring permission_jstr = va_arg(args, jstring);
+	if (!permission_jstr)
+		return JNI_TRUE;
+
+	const char *permission = jni->GetStringUTFChars(&jni, permission_jstr, NULL);
+	if (!permission)
+		return JNI_TRUE;
+
+	jboolean granted = JNI_TRUE;
+	if (strcmp(permission, "android.permission.READ_EXTERNAL_STORAGE") == 0 ||
+			strcmp(permission, "android.permission.WRITE_EXTERNAL_STORAGE") == 0) {
+		granted = JNI_TRUE;
+	}
+
+	jni->ReleaseStringUTFChars(&jni, permission_jstr, (char *)permission);
+	return granted;
+}
+
+static void jni_requestPermission(jmethodID id, va_list args) {
+	(void)id;
+	int request_code = va_arg(args, int);
+
+	native_on_permission_complete_fn cb = resolve_native_permission_callback();
+	if (cb) {
+		cb(&jni, NULL, request_code, JNI_TRUE);
+	}
+}
+
 static jobject jni_getHardwareDisplay(jmethodID id, va_list args) {
 	(void)id;
 	(void)args;
@@ -161,11 +207,14 @@ NameToMethodID nameToMethodId[] = {
 		{ 113, "getHardwareBoard", METHOD_TYPE_OBJECT },
 		{ 114, "getXDPI", METHOD_TYPE_FLOAT },
 		{ 115, "getYDPI", METHOD_TYPE_FLOAT },
+		{ 116, "hasPermission", METHOD_TYPE_BOOLEAN },
+		{ 117, "requestPermission", METHOD_TYPE_VOID },
 };
 
 MethodsBoolean methodsBoolean[] = {
 		{ 104, jni_hasFeature },
 		{ 108, jni_isUsingBluetooth },
+		{ 116, jni_hasPermission },
 };
 MethodsByte methodsByte[] = {};
 MethodsChar methodsChar[] = {};
@@ -193,6 +242,7 @@ MethodsObject methodsObject[] = {
 MethodsShort methodsShort[] = {};
 MethodsVoid methodsVoid[] = {
 		{ 105, jni_setFramebufferSize },
+		{ 117, jni_requestPermission },
 };
 
 /*
