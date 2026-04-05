@@ -27,6 +27,7 @@
 #define TELLTALE_PATCH_OBB_VERSIONED "patch." TELLTALE_OBB_VERSION "." TELLTALE_PKG_NAME ".obb"
 
 #define OBB_SCAN_MAX_DEPTH 5
+#define OBB_SCAN_ENTRY_BUDGET 4096
 
 #define ANDROID_OBB_REL_DIR "Android/obb/" TELLTALE_PKG_NAME "/"
 #define ANDROID_DATA_FILES_REL_DIR "Android/data/" TELLTALE_PKG_NAME "/files/"
@@ -67,6 +68,15 @@ static volatile int g_main_obb_open_done_logged = 0;
 static volatile int g_patch_obb_open_logged = 0;
 static volatile int g_patch_obb_open_done_logged = 0;
 static volatile int g_main_obb_parse_done_logged = 0;
+
+typedef struct obb_path_cache_entry {
+    int initialized;
+    int found;
+    char path[PATH_MAX];
+} obb_path_cache_entry;
+
+static obb_path_cache_entry g_main_obb_cache;
+static obb_path_cache_entry g_patch_obb_cache;
 
 static void log_obb_stage_before_open(const char *kind, const char *filename) {
     if (!kind || !filename)
@@ -175,9 +185,12 @@ static int try_build_obb_candidates(char *dst, size_t dst_size, const char *dir,
     return 0;
 }
 
-static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, char *dst, size_t dst_size) {
+static int scan_dir_for_file(const char *dir_path, const char *basename, int depth, int *entry_budget, char *dst, size_t dst_size) {
     unsigned int entry_idx = 0;
     if (!dir_path || !basename || !dst || dst_size == 0 || depth > OBB_SCAN_MAX_DEPTH)
+        return 0;
+
+    if (!entry_budget || *entry_budget <= 0)
         return 0;
 
     DIR *dir = opendir(dir_path);
@@ -187,6 +200,11 @@ static int scan_dir_for_file(const char *dir_path, const char *basename, int dep
     int found = 0;
     struct dirent *entry;
     while (!found && (entry = readdir(dir)) != NULL) {
+        if (*entry_budget <= 0) {
+            l_warn("OBB scan budget exhausted while searching for %s under %s", basename, dir_path);
+            break;
+        }
+        (*entry_budget)--;
         entry_idx++;
         if ((entry_idx % 100) == 0)
             l_info("main obb entry %u / ? (dir=%s)", entry_idx, dir_path);
@@ -220,7 +238,7 @@ static int scan_dir_for_file(const char *dir_path, const char *basename, int dep
         candidate[candidate_len] = '/';
         candidate[candidate_len + 1] = '\0';
 
-        found = scan_dir_for_file(candidate, basename, depth + 1, dst, dst_size);
+        found = scan_dir_for_file(candidate, basename, depth + 1, entry_budget, dst, dst_size);
     }
 
     closedir(dir);
@@ -230,6 +248,20 @@ static int scan_dir_for_file(const char *dir_path, const char *basename, int dep
 static int resolve_telltale_obb_path(const char *obb_kind, char *dst, size_t dst_size) {
     if (!obb_kind || !dst || dst_size == 0)
         return 0;
+
+    obb_path_cache_entry *cache_entry = NULL;
+    if (strcmp(obb_kind, "main") == 0)
+        cache_entry = &g_main_obb_cache;
+    else if (strcmp(obb_kind, "patch") == 0)
+        cache_entry = &g_patch_obb_cache;
+
+    if (cache_entry && cache_entry->initialized) {
+        if (!cache_entry->found)
+            return 0;
+
+        int copied = snprintf(dst, dst_size, "%s", cache_entry->path);
+        return copied > 0 && (size_t)copied < dst_size;
+    }
 
     // Primary Android-like location.
     if (try_build_obb_candidates(dst, dst_size, VITA_OBB_DIR, obb_kind))
@@ -246,19 +278,20 @@ static int resolve_telltale_obb_path(const char *obb_kind, char *dst, size_t dst
         return 1;
 
     // Last resort: scan under data root for these known OBB names.
+    int scan_budget = OBB_SCAN_ENTRY_BUDGET;
     if (strcmp(obb_kind, "main") == 0) {
-        if (scan_dir_for_file(DATA_PATH, TELLTALE_MAIN_OBB_VERSIONED, 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, TELLTALE_MAIN_OBB_VERSIONED, 0, &scan_budget, dst, dst_size))
             return 1;
-        if (scan_dir_for_file(DATA_PATH, "main.com.telltalegames.minecraft100.obb", 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, "main.com.telltalegames.minecraft100.obb", 0, &scan_budget, dst, dst_size))
             return 1;
-        if (scan_dir_for_file(DATA_PATH, "main.obb", 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, "main.obb", 0, &scan_budget, dst, dst_size))
             return 1;
     } else if (strcmp(obb_kind, "patch") == 0) {
-        if (scan_dir_for_file(DATA_PATH, TELLTALE_PATCH_OBB_VERSIONED, 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, TELLTALE_PATCH_OBB_VERSIONED, 0, &scan_budget, dst, dst_size))
             return 1;
-        if (scan_dir_for_file(DATA_PATH, "patch.com.telltalegames.minecraft100.obb", 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, "patch.com.telltalegames.minecraft100.obb", 0, &scan_budget, dst, dst_size))
             return 1;
-        if (scan_dir_for_file(DATA_PATH, "patch.obb", 0, dst, dst_size))
+        if (scan_dir_for_file(DATA_PATH, "patch.obb", 0, &scan_budget, dst, dst_size))
             return 1;
     }
 
@@ -291,8 +324,17 @@ static int remap_telltale_obb_path(const char *src, char *dst, size_t dst_size) 
     if (!obb_kind)
         return 0;
 
-    if (resolve_telltale_obb_path(obb_kind, dst, dst_size))
+    if (resolve_telltale_obb_path(obb_kind, dst, dst_size)) {
+        obb_path_cache_entry *cache_entry = strcmp(obb_kind, "main") == 0 ? &g_main_obb_cache : &g_patch_obb_cache;
+        cache_entry->initialized = 1;
+        cache_entry->found = 1;
+        snprintf(cache_entry->path, sizeof(cache_entry->path), "%s", dst);
         return 1;
+    }
+
+    obb_path_cache_entry *cache_entry = strcmp(obb_kind, "main") == 0 ? &g_main_obb_cache : &g_patch_obb_cache;
+    cache_entry->initialized = 1;
+    cache_entry->found = 0;
 
     return default_telltale_obb_path(obb_kind, dst, dst_size);
 }
