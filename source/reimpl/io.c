@@ -49,6 +49,14 @@ static const char *g_android_data_prefixes[] = {
     NULL,
 };
 
+static const char *g_android_storage_roots[] = {
+    "/storage/emulated/0/",
+    "/sdcard/",
+    "/mnt/sdcard/",
+    "/data/media/0/",
+    NULL,
+};
+
 #ifdef USE_SCELIBC_IO
 #include <libc_bridge/libc_bridge.h>
 #endif
@@ -369,6 +377,25 @@ static int remap_android_storage_path(const char *src, char *dst, size_t dst_siz
                 return 1;
             }
             l_warn("[path-remap] Android OBB path remap overflow for %s", src);
+            return 0;
+        }
+    }
+
+    // Platform_Android::GetUserLocation() builds writable paths under
+    // getExternalStorageDirectory() (e.g. /storage/emulated/0/<game-dir>).
+    // If those roots are not remapped on Vita, mkdir/stat operations stay on
+    // non-existent Android mountpoints and startup can stall before rendering.
+    for (int i = 0; g_android_storage_roots[i] != NULL; i++) {
+        const char *prefix = g_android_storage_roots[i];
+        size_t prefix_len = strlen(prefix);
+        if (strncmp(src, prefix, prefix_len) == 0) {
+            const char *relative = src + prefix_len;
+            int written = snprintf(dst, dst_size, "%s%s", DATA_PATH, relative);
+            if (written > 0 && (size_t)written < dst_size) {
+                l_info("[path-remap] Android storage root path %s => %s", src, dst);
+                return 1;
+            }
+            l_warn("[path-remap] Android storage root remap overflow for %s", src);
             return 0;
         }
     }
