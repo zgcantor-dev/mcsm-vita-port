@@ -117,6 +117,72 @@ static void ensure_net_for_fmod() {
     }
 }
 
+typedef struct FmodImportCheck {
+    const char *name;
+    void *symbol;
+} FmodImportCheck;
+
+static void verify_fmod_imports_or_fail(void) {
+#ifdef LOAD_FMODSTUDIO_SUPRX
+    static const FmodImportCheck required_symbols[] = {
+        { "FMOD_Memory_Initialize", FMOD_Memory_Initialize },
+        { "_ZN4FMOD6Studio6System6createEPPS1_j", _ZN4FMOD6Studio6System6createEPPS1_j },
+        { "_ZN4FMOD6Studio6System10initializeEijjPv", _ZN4FMOD6Studio6System10initializeEijjPv },
+        { "_ZN4FMOD6Studio6System12loadBankFileEPKcjPPNS0_4BankE", _ZN4FMOD6Studio6System12loadBankFileEPKcjPPNS0_4BankE },
+        { "_ZN4FMOD6Studio6System6updateEv", _ZN4FMOD6Studio6System6updateEv },
+        { "_ZN4FMOD6Studio13EventInstance5startEv", _ZN4FMOD6Studio13EventInstance5startEv },
+        { "_ZN4FMOD6System6updateEv", _ZN4FMOD6System6updateEv },
+        { "_ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE", _ZN4FMOD6System11createSoundEPKcjP22FMOD_CREATESOUNDEXINFOPPNS_5SoundE },
+    };
+
+    int missing_count = 0;
+    for (size_t i = 0; i < sizeof(required_symbols) / sizeof(required_symbols[0]); i++) {
+        if (!required_symbols[i].symbol) {
+            l_error("FMOD import unresolved: %s", required_symbols[i].name);
+            missing_count++;
+        } else {
+            l_info("FMOD import resolved: %s -> %p", required_symbols[i].name, required_symbols[i].symbol);
+        }
+    }
+
+    if (missing_count > 0) {
+        l_fatal("FMOD import verification failed: %d unresolved symbols", missing_count);
+        fatal_error("Error: unresolved FMOD imports (%d missing). Verify libfmodstudio.suprx + FMOD stubs are from matching versions.", missing_count);
+    }
+#endif
+}
+
+static void load_fmodstudio_module_or_fail(void) {
+#ifdef LOAD_FMODSTUDIO_SUPRX
+    static const char *candidate_paths[] = {
+        FMODSTUDIO_SUPRX,
+        "ur0:data/external/libfmodstudio.suprx",
+    };
+
+    for (size_t i = 0; i < sizeof(candidate_paths) / sizeof(candidate_paths[0]); i++) {
+        const char *path = candidate_paths[i];
+        if (!path || !path[0])
+            continue;
+
+        if (!file_exists(path)) {
+            l_warn("FMOD module candidate not found: %s", path);
+            continue;
+        }
+
+        int res = sceKernelLoadStartModule(path, 0, NULL, 0, NULL, NULL);
+        if (res >= 0) {
+            l_success("Loaded libfmodstudio.suprx from %s", path);
+            return;
+        }
+
+        l_warn("Failed to load libfmodstudio.suprx from %s: 0x%x", path, res);
+    }
+
+    l_fatal("Could not load libfmodstudio.suprx from any known path.");
+    fatal_error("Error: could not load libfmodstudio.suprx. Checked %s and ur0:data/external/libfmodstudio.suprx.", FMODSTUDIO_SUPRX);
+#endif
+}
+
 static void relocate_resolve_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
@@ -127,12 +193,7 @@ static void relocate_resolve_init(so_module *mod) {
 static void relocate_resolve_patch_init(so_module *mod) {
     so_relocate(mod);
     resolve_imports(mod);
-#ifdef LOAD_FMODSTUDIO_SUPRX
-    if (!FMOD_Memory_Initialize) {
-        l_fatal("FMOD_Memory_Initialize is unresolved after import resolution.");
-        fatal_error("Error: unresolved FMOD imports. Ensure libfmodstudio.suprx is installed at %s.", FMODSTUDIO_SUPRX);
-    }
-#endif
+    verify_fmod_imports_or_fail();
     so_patch();
     so_flush_caches(mod);
     so_initialize(mod);
@@ -234,7 +295,7 @@ void soloader_init_all() {
     ensure_net_for_fmod();
     load_module_or_warn("vs0:sys/external/libfios2.suprx", "libfios2.suprx");
     load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
-    load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
+    load_fmodstudio_module_or_fail();
 #endif
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
