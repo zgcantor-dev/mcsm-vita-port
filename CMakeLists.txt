@@ -39,17 +39,29 @@ add_definitions(-DDATA_PATH="${DATA_PATH}" -DSO_PATH="${SO_PATH}")
 # Additional Android .so libraries (additive only)
 # -----------------------------------------------------------------------------
 set(GAMEENGINE_SO "${DATA_PATH}libGameEngine.so" CACHE STRING "Path to libGameEngine.so")
+set(FMOD_SO "${DATA_PATH}libfmod.so" CACHE STRING "Path to Android libfmod.so")
+set(FMODSTUDIO_SO "${DATA_PATH}libfmodstudio.so" CACHE STRING "Path to Android libfmodstudio.so")
 set(FMODSTUDIO_SUPRX "ur0:data/libfmodstudio.suprx" CACHE STRING "Path to Vita FMOD Studio module")
 add_definitions(
   -DGAMEENGINE_SO="${GAMEENGINE_SO}"
+  -DFMOD_SO="${FMOD_SO}"
+  -DFMODSTUDIO_SO="${FMODSTUDIO_SO}"
   -DFMODSTUDIO_SUPRX="${FMODSTUDIO_SUPRX}"
 )
 
 # Optional runtime-loading switches (only affect code if you use these defines)
 option(LOAD_GAMEENGINE_SO "Load libGameEngine.so at runtime" ON)
+option(LOAD_FMOD_SO "Load Android libfmod.so at runtime (preferred for symbol parity)" ON)
+option(LOAD_FMODSTUDIO_SO "Load Android libfmodstudio.so at runtime (preferred for symbol parity)" ON)
 option(LOAD_FMODSTUDIO_SUPRX "Load libfmodstudio.suprx at runtime" ON)
 if (LOAD_GAMEENGINE_SO)
   add_definitions(-DLOAD_GAMEENGINE_SO)
+endif()
+if (LOAD_FMOD_SO)
+  add_definitions(-DLOAD_FMOD_SO)
+endif()
+if (LOAD_FMODSTUDIO_SO)
+  add_definitions(-DLOAD_FMODSTUDIO_SO)
 endif()
 if (LOAD_FMODSTUDIO_SUPRX)
   add_definitions(-DLOAD_FMODSTUDIO_SUPRX)
