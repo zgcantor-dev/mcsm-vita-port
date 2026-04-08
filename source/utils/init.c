@@ -45,6 +45,12 @@ extern so_module so_mod;
 #ifdef LOAD_GAMEENGINE_SO
 static so_module gameengine_mod;
 #endif
+#ifdef LOAD_FMOD_SO
+static so_module fmod_mod;
+#endif
+#ifdef LOAD_FMODSTUDIO_SO
+static so_module fmodstudio_mod;
+#endif
 static so_module main_trace_mod;
 static int main_trace_loaded;
 
@@ -236,6 +242,22 @@ void soloader_init_all() {
     load_module_or_warn("vs0:sys/external/libc.suprx", "libc.suprx");
     load_module_or_fail(FMODSTUDIO_SUPRX, "libfmodstudio.suprx");
 #endif
+#ifdef LOAD_FMOD_SO
+    if (file_exists(FMOD_SO)) {
+        load_so_or_fail(&fmod_mod, FMOD_SO, "libfmod.so", load_address);
+        load_address += LOAD_ADDRESS_STEP;
+    } else {
+        l_warn("Optional dependency missing: libfmod.so (%s)", FMOD_SO);
+    }
+#endif
+#ifdef LOAD_FMODSTUDIO_SO
+    if (file_exists(FMODSTUDIO_SO)) {
+        load_so_or_fail(&fmodstudio_mod, FMODSTUDIO_SO, "libfmodstudio.so", load_address);
+        load_address += LOAD_ADDRESS_STEP;
+    } else {
+        l_warn("Optional dependency missing: libfmodstudio.so (%s)", FMODSTUDIO_SO);
+    }
+#endif
 #ifdef LOAD_GAMEENGINE_SO
     load_so_or_fail(&gameengine_mod, GAMEENGINE_SO, "libGameEngine.so", load_address);
     load_address += LOAD_ADDRESS_STEP;
@@ -253,6 +275,14 @@ void soloader_init_all() {
     so_mod = gameengine_mod;
 #endif
 
+#ifdef LOAD_FMOD_SO
+    if (fmod_mod.text_base)
+        relocate_resolve_init(&fmod_mod);
+#endif
+#ifdef LOAD_FMODSTUDIO_SO
+    if (fmodstudio_mod.text_base)
+        relocate_resolve_init(&fmodstudio_mod);
+#endif
 #ifdef LOAD_GAMEENGINE_SO
     relocate_resolve_patch_init(&gameengine_mod);
 #endif
